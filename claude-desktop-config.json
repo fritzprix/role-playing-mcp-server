@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "rpg-game-server": {
+      "command": "npx",
+      "args": ["rpg-mcp-server"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
