@@ -3,11 +3,11 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { GameManager } from './gameManager.js';
-import { CreateGameParams, UpdateGameParams, GetGameParams, ErrorResponse } from './types.js';
+import { CreateGameParams, UpdateGameParams, GetGameParams, ProgressAndPromptUserActionParams, ErrorResponse } from './types.js';
 
 /**
  * RPG 게임 MCP 서버
- * 3개의 Tool만 제공: createGame, updateGame, getGame
+ * 4개의 Tool 제공: createGame, updateGame, getGame, progressAndPromptUserAction
  */
 class RPGMCPServer {
   private server: Server;
@@ -49,6 +49,10 @@ class RPGMCPServer {
             
           case 'getGame':
             result = await this.handleGetGame(toolArgs as unknown as GetGameParams);
+            break;
+            
+          case 'progressAndPromptUserAction':
+            result = await this.handleProgressAndPromptUserAction(toolArgs as unknown as ProgressAndPromptUserActionParams);
             break;
             
           default:
@@ -160,6 +164,20 @@ class RPGMCPServer {
               },
               required: ["gameId"]
             }
+          },
+          {
+            name: "progressAndPromptUserAction",
+            description: "Progress the game story and prompt the user for the next action. This tool advances the game narrative and provides choices for the player.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                gameId: {
+                  type: "string",
+                  description: "ID of the game to progress"
+                }
+              },
+              required: ["gameId"]
+            }
           }
         ]
       };
@@ -185,6 +203,13 @@ class RPGMCPServer {
       throw new Error('gameId parameter is required');
     }
     return this.gameManager.getGame(params.gameId);
+  }
+
+  private async handleProgressAndPromptUserAction(params: ProgressAndPromptUserActionParams): Promise<any> {
+    if (!params.gameId) {
+      throw new Error('gameId parameter is required');
+    }
+    return this.gameManager.progressAndPromptUserAction(params.gameId);
   }
 
   /**

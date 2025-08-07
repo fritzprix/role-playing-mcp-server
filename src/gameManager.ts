@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { Game, GameState } from './types.js';
+import { Game, GameState, GameResponse } from './types.js';
 
 /**
  * 게임 관리자 클래스
@@ -11,7 +11,7 @@ export class GameManager {
   /**
    * 새 게임 생성
    */
-  createGame(initialState: GameState): Game {
+  createGame(initialState: GameState): GameResponse {
     const gameId = randomUUID();
     const now = new Date();
     
@@ -25,13 +25,16 @@ export class GameManager {
     this.games.set(gameId, game);
     
     console.error(`Game created with ID: ${gameId}`);
-    return game;
+    return {
+      game,
+      nextActions: ["progressAndPromptUserAction"]
+    };
   }
 
   /**
    * 게임 상태 업데이트
    */
-  updateGame(gameId: string, fieldSelector: string, value: any): Game {
+  updateGame(gameId: string, fieldSelector: string, value: any): GameResponse {
     const game = this.games.get(gameId);
     if (!game) {
       throw new Error(`Game with id ${gameId} not found`);
@@ -51,18 +54,42 @@ export class GameManager {
     game.updatedAt = new Date();
     
     console.error(`Game ${gameId} updated: ${fieldSelector} = ${JSON.stringify(value)}`);
-    return game;
+    return {
+      game,
+      nextActions: ["progressAndPromptUserAction"]
+    };
   }
 
   /**
    * 게임 조회
    */
-  getGame(gameId: string): Game {
+  getGame(gameId: string): GameResponse {
     const game = this.games.get(gameId);
     if (!game) {
       throw new Error(`Game with id ${gameId} not found`);
     }
-    return game;
+    return {
+      game,
+      nextActions: []
+    };
+  }
+
+  /**
+   * 게임 진행 및 사용자 액션 프롬프트
+   */
+  progressAndPromptUserAction(gameId: string): GameResponse {
+    const game = this.games.get(gameId);
+    if (!game) {
+      throw new Error(`Game with id ${gameId} not found`);
+    }
+    
+    // 게임 진행 로직은 여기서 처리 (AI가 스토리 진행, 이벤트 발생 등)
+    console.error(`Game ${gameId} progressing and prompting user action`);
+    
+    return {
+      game,
+      nextActions: ["user turn", "updateGame"]
+    };
   }
 
   /**

@@ -67,6 +67,18 @@ export interface GetGameParams {
   gameId: string;
 }
 
+export interface ProgressAndPromptUserActionParams {
+  gameId: string;
+}
+
+/**
+ * 게임 응답 타입 - nextActions를 포함
+ */
+export interface GameResponse {
+  game: Game;
+  nextActions: string[];
+}
+
 /**
  * 응답 타입들
  */
