@@ -29,7 +29,7 @@
     "@types/node": "^20.0.0"
   },
   "keywords": ["mcp", "rpg", "game", "llm", "typescript", "claude", "ai"],
-  "author": "",
+  "author": "fritzprix <innocentevil0914@gmail.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
