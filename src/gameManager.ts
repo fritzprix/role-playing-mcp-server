@@ -27,7 +27,7 @@ export class GameManager {
     console.error(`Game created with ID: ${gameId}`);
     return {
       game,
-      nextActions: ["progressAndPromptUserAction"]
+      nextActions: ["progressStory"]
     };
   }
 
@@ -56,7 +56,7 @@ export class GameManager {
     console.error(`Game ${gameId} updated: ${fieldSelector} = ${JSON.stringify(value)}`);
     return {
       game,
-      nextActions: ["progressAndPromptUserAction"]
+      nextActions: ["progressStory"]
     };
   }
 
@@ -74,21 +74,42 @@ export class GameManager {
     };
   }
 
+
   /**
-   * 게임 진행 및 사용자 액션 프롬프트
+   * 스토리 진행
    */
-  progressAndPromptUserAction(gameId: string): GameResponse {
+  progressStory(gameId: string, progress: string): GameResponse {
     const game = this.games.get(gameId);
     if (!game) {
       throw new Error(`Game with id ${gameId} not found`);
     }
-    
-    // 게임 진행 로직은 여기서 처리 (AI가 스토리 진행, 이벤트 발생 등)
-    console.error(`Game ${gameId} progressing and prompting user action`);
-    
+    // progress 파라미터를 활용해 스토리 진행 상황을 기록하거나 반영할 수 있음
+    game.state.story = game.state.story || {};
+    game.state.story.progress = progress;
+    game.updatedAt = new Date();
+    console.error(`Game ${gameId} story progressed: ${progress}`);
     return {
       game,
-      nextActions: ["user turn", "updateGame"]
+      nextActions: ["promptUserActions"]
+    };
+  }
+
+  /**
+   * 사용자 액션 프롬프트
+   */
+  promptUserActions(gameId: string, options: string[]): GameResponse {
+    const game = this.games.get(gameId);
+    if (!game) {
+      throw new Error(`Game with id ${gameId} not found`);
+    }
+    // options 파라미터를 활용해 유저에게 선택지를 제시
+    // 게임 상태와 분리된 메타데이터로 저장하는 것이 더 안전할 수 있음
+    game.state._currentOptions = options; // 앞에 _를 붙여 시스템 필드임을 표시
+    game.updatedAt = new Date();
+    console.error(`Game ${gameId} prompting user actions: ${JSON.stringify(options)}`);
+    return {
+      game,
+      nextActions: []
     };
   }
 

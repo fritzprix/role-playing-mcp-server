@@ -3,11 +3,11 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { GameManager } from './gameManager.js';
-import { CreateGameParams, UpdateGameParams, GetGameParams, ProgressAndPromptUserActionParams, ErrorResponse } from './types.js';
+import { CreateGameParams, UpdateGameParams, GetGameParams, ProgressStoryParams, PromptUserActionsParams, ErrorResponse } from './types.js';
 
 /**
  * RPG 게임 MCP 서버
- * 4개의 Tool 제공: createGame, updateGame, getGame, progressAndPromptUserAction
+ * 5개의 Tool 제공: createGame, updateGame, getGame, progressStory, promptUserActions
  */
 class RPGMCPServer {
   private server: Server;
@@ -42,19 +42,18 @@ class RPGMCPServer {
           case 'createGame':
             result = await this.handleCreateGame(toolArgs as unknown as CreateGameParams);
             break;
-            
           case 'updateGame':
             result = await this.handleUpdateGame(toolArgs as unknown as UpdateGameParams);
             break;
-            
           case 'getGame':
             result = await this.handleGetGame(toolArgs as unknown as GetGameParams);
             break;
-            
-          case 'progressAndPromptUserAction':
-            result = await this.handleProgressAndPromptUserAction(toolArgs as unknown as ProgressAndPromptUserActionParams);
+          case 'progressStory':
+            result = await this.handleProgressStory(toolArgs as unknown as ProgressStoryParams);
             break;
-            
+          case 'promptUserActions':
+            result = await this.handlePromptUserActions(toolArgs as unknown as PromptUserActionsParams);
+            break;
           default:
             throw new Error(`Unknown tool: ${toolName}`);
         }
@@ -166,17 +165,41 @@ class RPGMCPServer {
             }
           },
           {
-            name: "progressAndPromptUserAction",
-            description: "Progress the game story and prompt the user for the next action. This tool advances the game narrative and provides choices for the player.",
+            name: "progressStory",
+            description: "Progress the game story. Advances the narrative and sets the current story progress. This should be called after createGame or updateGame to continue the story flow.",
             inputSchema: {
               type: "object",
               properties: {
                 gameId: {
                   type: "string",
                   description: "ID of the game to progress"
+                },
+                progress: {
+                  type: "string",
+                  description: "Description of the current story progress or event. Should describe what happens next in the narrative."
                 }
               },
-              required: ["gameId"]
+              required: ["gameId", "progress"]
+            }
+          },
+          {
+            name: "promptUserActions",
+            description: "Prompt the user with available action options. This completes the story progression cycle and waits for user input before the next updateGame call.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                gameId: {
+                  type: "string",
+                  description: "ID of the game to prompt"
+                },
+                options: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "List of available user action options. Must contain at least one option.",
+                  minItems: 1
+                }
+              },
+              required: ["gameId", "options"]
             }
           }
         ]
@@ -205,11 +228,22 @@ class RPGMCPServer {
     return this.gameManager.getGame(params.gameId);
   }
 
-  private async handleProgressAndPromptUserAction(params: ProgressAndPromptUserActionParams): Promise<any> {
-    if (!params.gameId) {
-      throw new Error('gameId parameter is required');
+
+  private async handleProgressStory(params: ProgressStoryParams): Promise<any> {
+    if (!params.gameId || typeof params.progress !== 'string') {
+      throw new Error('gameId and progress parameters are required');
     }
-    return this.gameManager.progressAndPromptUserAction(params.gameId);
+    return this.gameManager.progressStory(params.gameId, params.progress);
+  }
+
+  private async handlePromptUserActions(params: PromptUserActionsParams): Promise<any> {
+    if (!params.gameId || !Array.isArray(params.options)) {
+      throw new Error('gameId and options parameters are required');
+    }
+    if (params.options.length === 0) {
+      throw new Error('options array cannot be empty');
+    }
+    return this.gameManager.promptUserActions(params.gameId, params.options);
   }
 
   /**

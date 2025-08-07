@@ -67,8 +67,15 @@ export interface GetGameParams {
   gameId: string;
 }
 
-export interface ProgressAndPromptUserActionParams {
+
+export interface ProgressStoryParams {
   gameId: string;
+  progress: string;
+}
+
+export interface PromptUserActionsParams {
+  gameId: string;
+  options: string[];
 }
 
 /**
