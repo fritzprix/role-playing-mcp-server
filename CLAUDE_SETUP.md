@@ -47,6 +47,7 @@ Claude Desktop에서 다음과 같이 테스트해보세요:
 ## 문제 해결
 
 ### Node.js 미설치 오류
+
 ```
 Error: command not found: npx
 ```
@@ -54,20 +55,24 @@ Error: command not found: npx
 **해결방법**: [Node.js](https://nodejs.org/)를 설치하세요 (v18 이상 권장).
 
 ### 권한 오류
+
 ```
 Error: permission denied
 ```
 
-**해결방법**: 
+**해결방법**:
+
 - macOS/Linux: `sudo npm install -g rpg-mcp-server`
 - Windows: 관리자 권한으로 PowerShell 실행
 
 ### 네트워크 오류
+
 ```
 Error: unable to resolve
 ```
 
-**해결방법**: 
+**해결방법**:
+
 1. 인터넷 연결 확인
 2. 방화벽/프록시 설정 확인
 3. 로컬 개발 버전 사용 (아래 참고)
@@ -77,6 +82,7 @@ Error: unable to resolve
 NPM 패키지 대신 로컬 소스를 사용하려면:
 
 1. 이 저장소를 클론
+
 ```bash
 git clone <repository-url>
 cd rpg-mcp-server
@@ -85,6 +91,7 @@ npm run build
 ```
 
 2. Claude Desktop 설정 수정
+
 ```json
 {
   "mcpServers": {
@@ -103,6 +110,7 @@ npm run build
 ## 고급 설정
 
 ### 디버그 모드 활성화
+
 ```json
 {
   "mcpServers": {
@@ -119,6 +127,7 @@ npm run build
 ```
 
 ### 포트 변경 (필요시)
+
 ```json
 {
   "mcpServers": {
@@ -136,6 +145,7 @@ npm run build
 ## 지원
 
 문제가 발생하면:
+
 1. Claude Desktop 재시작
 2. 설정 파일 문법 확인 (JSON validator 사용)
 3. Node.js 버전 확인 (`node --version`)
