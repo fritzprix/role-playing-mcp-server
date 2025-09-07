@@ -2,7 +2,6 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { createUIResource } from '@mcp-ui/server';
 import { GameManager } from './gameManager.js';
 import {
   CreateGameParams,
@@ -309,23 +308,26 @@ class RPGMCPServer {
     }
     const result = this.gameManager.promptUserActions(params.gameId, params.options);
 
-    // @mcp-ui/server를 사용해서 UI 리소스 생성
+    // UI 리소스를 수동으로 생성 (mimeType 포함)
     const uiHtml = this.generateGameUI(
       result.game.state.lastStoryProgress || '게임이 시작됩니다...',
       params.options,
       params.gameId
     );
 
-    const uiResource = createUIResource({
-      uri: `ui://rpg-game/${params.gameId}/actions`,
-      content: { type: 'rawHtml', htmlString: uiHtml },
-      encoding: 'text',
-      metadata: {
-        title: 'RPG Game Actions',
-        description: `게임 ${params.gameId}의 액션 선택`,
-        preferredRenderContext: 'main',
-      },
-    });
+    const uiResource = {
+      type: 'resource' as const,
+      resource: {
+        uri: `ui://rpg-game/${params.gameId}/actions`,
+        mimeType: 'text/html',
+        text: uiHtml,
+        _meta: {
+          title: 'RPG Game Actions',
+          description: `게임 ${params.gameId}의 액션 선택`,
+          preferredRenderContext: 'main',
+        }
+      }
+    };
 
     return {
       content: [
