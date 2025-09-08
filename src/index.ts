@@ -11,6 +11,7 @@ import {
   PromptUserActionsParams,
   SelectActionParams,
   ErrorResponse,
+  DeltaInfo,
 } from './types.js';
 
 /**
@@ -315,6 +316,9 @@ class RPGMCPServer {
       params.gameId
     );
 
+    // Delta clear
+    this.gameManager.clearDeltas(params.gameId);
+
     const uiResource = {
       type: 'resource' as const,
       resource: {
@@ -344,6 +348,13 @@ class RPGMCPServer {
    * 게임 UI HTML 생성
    */
   private generateGameUI(storyProgress: string, options: string[], gameId: string): string {
+    // 게임 상태에서 pendingDeltas 가져오기
+    const game = this.gameManager.getGame(gameId).game;
+    const pendingDeltas = game.state._pendingDeltas || [];
+    
+    // Delta 섹션 HTML 생성
+    const deltaSection = this.generateDeltaSection(pendingDeltas);
+
     const optionButtons = options.map((option, index) => `
       <button 
         class="action-button" 
@@ -390,6 +401,40 @@ class RPGMCPServer {
             margin-bottom: 20px;
             font-size: 18px;
         }
+        .delta-section {
+            background: #fff3cd;
+            border-left: 5px solid #ffc107;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            animation: slideIn 0.5s ease-in;
+        }
+        .delta-section h3 {
+            color: #856404;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        .delta-item {
+            background: #ffffff;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            border-radius: 5px;
+            border-left: 3px solid #ffc107;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .delta-item:last-child {
+            margin-bottom: 0;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
         .action-button {
             display: block;
             width: 100%;
@@ -424,6 +469,8 @@ class RPGMCPServer {
         <div class="story-section">
             ${storyProgress}
         </div>
+        
+        ${deltaSection}
         
         <div class="actions-section">
             <h3>🎯 선택하세요:</h3>
@@ -468,6 +515,28 @@ class RPGMCPServer {
     </script>
 </body>
 </html>`;
+  }
+
+  /**
+   * Delta 섹션 HTML 생성
+   */
+  private generateDeltaSection(deltas: DeltaInfo[]): string {
+    if (deltas.length === 0) {
+      return '';
+    }
+
+    const deltaItems = deltas.map(delta => `
+      <div class="delta-item">
+        ⚡ ${delta.description}
+      </div>
+    `).join('');
+
+    return `
+      <div class="delta-section">
+        <h3>📊 최근 변경사항</h3>
+        ${deltaItems}
+      </div>
+    `;
   }
 
   private async handleSelectAction(params: SelectActionParams): Promise<CallToolResult> {

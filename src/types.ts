@@ -10,6 +10,17 @@ export interface GameHistoryEntry {
 }
 
 /**
+ * Delta 정보 타입
+ */
+export interface DeltaInfo {
+  field: string;
+  initialValue: any;
+  finalValue: any;
+  timestamp: Date;
+  description: string;
+}
+
+/**
  * 게임 상태 타입 정의
  */
 export interface GameState {
@@ -25,6 +36,8 @@ export interface GameState {
     index: number;
     timestamp: Date;
   };
+  _pendingDeltas?: DeltaInfo[]; // promptUserAction 사이의 누적 변경사항
+  _lastPromptTime?: Date; // 마지막 promptUserAction 호출 시간
   [key: string]: any; // 유연한 구조를 위해 추가 프로퍼티 허용
 }
 

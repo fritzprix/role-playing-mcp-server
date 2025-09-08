@@ -2,7 +2,8 @@ import { randomUUID } from 'crypto';
 import type {
   Game,
   GameResponse,
-  GameState
+  GameState,
+  DeltaInfo
 } from './types.js';
 
 /**
@@ -45,10 +46,13 @@ export class GameManager {
     }
 
     // 게임 상태의 깊은 복사본 생성
-  const newState: GameState = JSON.parse(JSON.stringify(game.state));
+    const newState: GameState = JSON.parse(JSON.stringify(game.state));
 
     // 경로에서 'game.' 접두사 제거 (호환성)
     const cleanPath = fieldSelector.replace(/^game\./, '');
+
+    // Delta 정보 추가/업데이트
+    this.addOrUpdateDelta(newState, cleanPath, value);
 
     // 중첩된 값 설정
     this.setNestedValue(newState, cleanPath, value);
@@ -141,6 +145,10 @@ export class GameManager {
     // options 파라미터를 활용해 유저에게 선택지를 제시
     // 게임 상태와 분리된 메타데이터로 저장하는 것이 더 안전할 수 있음
     game.state._currentOptions = options;
+    
+    // 현재 시간을 lastPromptTime으로 설정
+    game.state._lastPromptTime = new Date();
+    
     game.updatedAt = new Date();
     console.error(`Game ${gameId} prompting user actions: ${JSON.stringify(options)}`);
     return {
@@ -251,5 +259,122 @@ export class GameManager {
    */
   deleteGame(gameId: string): boolean {
     return this.games.delete(gameId);
+  }
+
+  /**
+   * 특정 게임의 pending deltas 클리어
+   */
+  clearDeltas(gameId: string): void {
+    const game = this.games.get(gameId);
+    if (game) {
+      game.state._pendingDeltas = [];
+    }
+  }
+
+  /**
+   * Delta 정보를 추가하거나 업데이트
+   */
+  private addOrUpdateDelta(state: GameState, field: string, newValue: unknown): void {
+    if (!state._pendingDeltas) {
+      state._pendingDeltas = [];
+    }
+
+    // 현재 값 가져오기
+    const currentValue = this.getNestedValue(state, field);
+
+    // 기존 delta 찾기
+    const existingDeltaIndex = state._pendingDeltas.findIndex(delta => delta.field === field);
+
+    if (existingDeltaIndex !== -1) {
+      // 기존 delta 업데이트 (finalValue만 변경)
+      const existingDelta = state._pendingDeltas[existingDeltaIndex];
+      existingDelta.finalValue = newValue;
+      existingDelta.timestamp = new Date();
+      existingDelta.description = this.generateDeltaDescription(field, existingDelta.initialValue, newValue);
+    } else {
+      // 새 delta 추가
+      const deltaInfo: DeltaInfo = {
+        field,
+        initialValue: currentValue,
+        finalValue: newValue,
+        timestamp: new Date(),
+        description: this.generateDeltaDescription(field, currentValue, newValue)
+      };
+      state._pendingDeltas.push(deltaInfo);
+    }
+  }
+
+  /**
+   * 중첩된 객체에서 값 가져오기
+   */
+  private getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+    const keys = this.parsePath(path);
+    let current: any = obj;
+
+    for (const key of keys) {
+      if (current && typeof current === 'object' && key in current) {
+        current = current[key];
+      } else {
+        return undefined;
+      }
+    }
+
+    return current;
+  }
+
+  /**
+   * Delta 설명 메시지 생성
+   */
+  private generateDeltaDescription(field: string, initialValue: unknown, finalValue: unknown): string {
+    // 사용자 친화적인 필드명 변환
+    const friendlyFieldName = this.getFriendlyFieldName(field);
+    
+    // 값의 타입에 따른 설명 생성
+    if (Array.isArray(finalValue) && Array.isArray(initialValue)) {
+      const initialLength = initialValue.length;
+      const finalLength = finalValue.length;
+      if (finalLength > initialLength) {
+        return `${friendlyFieldName}에 ${finalLength - initialLength}개 항목이 추가되었습니다`;
+      } else if (finalLength < initialLength) {
+        return `${friendlyFieldName}에서 ${initialLength - finalLength}개 항목이 제거되었습니다`;
+      } else {
+        return `${friendlyFieldName}이(가) 변경되었습니다`;
+      }
+    } else if (typeof finalValue === 'number' && typeof initialValue === 'number') {
+      const change = finalValue - initialValue;
+      if (change > 0) {
+        return `${friendlyFieldName}이(가) ${change} 증가했습니다 (${initialValue} → ${finalValue})`;
+      } else {
+        return `${friendlyFieldName}이(가) ${Math.abs(change)} 감소했습니다 (${initialValue} → ${finalValue})`;
+      }
+    } else {
+      return `${friendlyFieldName}이(가) ${JSON.stringify(initialValue)}에서 ${JSON.stringify(finalValue)}로 변경되었습니다`;
+    }
+  }
+
+  /**
+   * 사용자 친화적인 필드명 반환
+   */
+  private getFriendlyFieldName(field: string): string {
+    const fieldMap: Record<string, string> = {
+      'characters': '캐릭터',
+      'world': '세계',
+      'inventory': '인벤토리',
+      'story': '스토리',
+      'title': '제목',
+      'hp': '체력',
+      'mp': '마나',
+      'level': '레벨',
+      'favorability': '호감도',
+      'location': '위치',
+      'time': '시간',
+      'weather': '날씨'
+    };
+
+    // 배열 인덱스나 중첩 경로 처리
+    const parts = field.split(/[.\[\]]/);
+    const mainField = parts[0];
+    
+    return fieldMap[mainField] || mainField;
   }
 }
