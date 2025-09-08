@@ -12,6 +12,8 @@ import {
   SelectActionParams,
   ErrorResponse,
   DeltaInfo,
+  Game,
+  ActionPromptGameInfo,
 } from './types.js';
 
 /**
@@ -311,7 +313,7 @@ class RPGMCPServer {
 
     // UI 리소스를 수동으로 생성 (mimeType 포함)
     const uiHtml = this.generateGameUI(
-      result.game.state.lastStoryProgress || '게임이 시작됩니다...',
+      (result.game as ActionPromptGameInfo).progress || '게임이 시작됩니다...',
       params.options,
       params.gameId
     );
@@ -349,7 +351,7 @@ class RPGMCPServer {
    */
   private generateGameUI(storyProgress: string, options: string[], gameId: string): string {
     // 게임 상태에서 pendingDeltas 가져오기
-    const game = this.gameManager.getGame(gameId).game;
+    const game = this.gameManager.getGame(gameId).game as Game;
     const pendingDeltas = game.state._pendingDeltas || [];
     
     // Delta 섹션 HTML 생성

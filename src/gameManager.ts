@@ -3,7 +3,10 @@ import type {
   Game,
   GameResponse,
   GameState,
-  DeltaInfo
+  DeltaInfo,
+  ProgressGameInfo,
+  ActionPromptGameInfo,
+  ActionSelectionGameInfo
 } from './types.js';
 
 /**
@@ -106,7 +109,13 @@ export class GameManager {
     game.updatedAt = new Date();
 
     return {
-      game,
+      game: {
+        gameId: game.gameId,
+        situation: game.state.lastStoryProgress,
+        selectedOption,
+        selectedIndex,
+        timestamp: game.state.selectedAction.timestamp
+      } as ActionSelectionGameInfo,
       nextActions: ["updateGame"] // 다음 업데이트로 체인 연결
     };
   }
@@ -119,6 +128,9 @@ export class GameManager {
     if (!game) {
       throw new Error(`Game with id ${gameId} not found`);
     }
+    
+    const prevProgress = game.state.lastStoryProgress;
+    
     // progress 파라미터를 활용해 스토리 진행 상황을 기록하거나 반영할 수 있음
     if (!game.state.story) {
       game.state.story = { progress };
@@ -128,8 +140,14 @@ export class GameManager {
     game.state.lastStoryProgress = progress;
     game.updatedAt = new Date();
     console.error(`Game ${gameId} story progressed: ${progress}`);
+    
     return {
-      game,
+      game: {
+        gameId: game.gameId,
+        prevProgress,
+        currentProgress: progress,
+        updatedAt: game.updatedAt
+      } as ProgressGameInfo,
       nextActions: ['promptUserActions'],
     };
   }
@@ -151,9 +169,15 @@ export class GameManager {
     
     game.updatedAt = new Date();
     console.error(`Game ${gameId} prompting user actions: ${JSON.stringify(options)}`);
+    
     return {
-      game,
-      nextActions: [],
+      game: {
+        gameId: game.gameId,
+        progress: game.state.lastStoryProgress,
+        options,
+        promptTime: game.state._lastPromptTime
+      } as ActionPromptGameInfo,
+      nextActions: ['selectAction'],
     };
   }
 

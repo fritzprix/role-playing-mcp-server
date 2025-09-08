@@ -115,10 +115,35 @@ export interface SelectActionParams {
 }
 
 /**
+ * 축약된 게임 정보 타입들
+ */
+export interface ProgressGameInfo {
+  gameId: string;
+  prevProgress?: string;
+  currentProgress: string;
+  updatedAt: Date;
+}
+
+export interface ActionPromptGameInfo {
+  gameId: string;
+  progress?: string;
+  options: string[];
+  promptTime?: Date;
+}
+
+export interface ActionSelectionGameInfo {
+  gameId: string;
+  situation?: string;
+  selectedOption: string;
+  selectedIndex: number;
+  timestamp?: Date;
+}
+
+/**
  * 게임 응답 타입 - nextActions를 포함
  */
 export interface GameResponse {
-  game: Game;
+  game: Game | ProgressGameInfo | ActionPromptGameInfo | ActionSelectionGameInfo;
   nextActions: string[];
 }
 
