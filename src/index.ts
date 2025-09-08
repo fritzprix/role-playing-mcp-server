@@ -352,7 +352,10 @@ class RPGMCPServer {
   private generateGameUI(storyProgress: string, options: string[], gameId: string): string {
     // 게임 상태에서 pendingDeltas 가져오기
     const game = this.gameManager.getGame(gameId).game as Game;
-    const pendingDeltas = game.state._pendingDeltas || [];
+    // progress 관련 delta는 제외
+    const pendingDeltas = (game.state._pendingDeltas || []).filter(
+      delta => !/(progress|lastStoryProgress|story\.progress)$/i.test(delta.field)
+    );
     
     // Delta 섹션 HTML 생성
     const deltaSection = this.generateDeltaSection(pendingDeltas);
