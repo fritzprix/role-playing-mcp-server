@@ -111,7 +111,7 @@ class RPGMCPServer {
           {
             name: 'createGame',
             description:
-              'Create a new RPG game with complete initial state. Returns the created game with assigned gameId.',
+              'Create a new RPG game with complete initial state. Returns the created game with assigned gameId. Use updateGame or progressStory next to continue the game flow.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -136,7 +136,7 @@ class RPGMCPServer {
           {
             name: 'updateGame',
             description:
-              'Update a specific field in the game state and return the complete updated game state. Supports nested property updates using path notation.',
+              'Update a specific field in the game state and return the complete updated game state. Supports nested property updates using path notation. Use progressStory next to advance the narrative.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -168,7 +168,7 @@ class RPGMCPServer {
           },
           {
             name: 'getGame',
-            description: 'Retrieve the complete current state of a game by its ID.',
+            description: 'Retrieve the complete current state of a game by its ID. Use this tool anytime to inspect the game state.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -183,7 +183,7 @@ class RPGMCPServer {
           {
             name: 'progressStory',
             description:
-              'Progress the game story. Advances the narrative and sets the current story progress. This should be called after createGame or updateGame to continue the story flow.',
+              'Advance the game narrative and set the current story progress. This tool should be called after createGame or updateGame. Use promptUserActions next to present choices to the user.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -203,7 +203,7 @@ class RPGMCPServer {
           {
             name: 'promptUserActions',
             description:
-              'Prompt the user with available action options. This completes the story progression cycle and waits for user input before the next updateGame call.',
+              'Present the user with available action options. This tool should be called after progressStory to complete the story cycle and wait for user input. Use selectAction next after the user selects an option.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -224,7 +224,7 @@ class RPGMCPServer {
           },
           {
             name: "selectAction",
-            description: "Process user's selected action from UI and continue game flow",
+            description: "Process the user's selected action from the UI and continue the game flow. This tool should be called after promptUserActions when the user makes a selection. Use updateGame next to reflect the result of the action.",
             inputSchema: {
               type: "object",
               properties: {
