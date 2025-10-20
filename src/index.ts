@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { CallToolRequestSchema, ListToolsRequestSchema, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  CallToolResult,
+} from '@modelcontextprotocol/sdk/types.js';
 import { GameManager } from './gameManager.js';
 import {
   CreateGameParams,
@@ -12,6 +16,7 @@ import {
   SelectActionParams,
   ErrorResponse,
   DeltaInfo,
+  GameHistoryEntry,
 } from './types.js';
 
 /**
@@ -78,6 +83,7 @@ class RPGMCPServer {
         console.error(`Tool ${toolName} executed successfully`); // 성공 로그
 
         return result;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         console.error('Tool execution error:', {
           name: toolName,
@@ -168,7 +174,8 @@ class RPGMCPServer {
           },
           {
             name: 'getGame',
-            description: 'Retrieve the complete current state of a game by its ID. Use this tool anytime to inspect the game state.',
+            description:
+              'Retrieve the complete current state of a game by its ID. Use this tool anytime to inspect the game state.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -223,21 +230,82 @@ class RPGMCPServer {
             },
           },
           {
-            name: "selectAction",
-            description: "Process the user's selected action from the UI and continue the game flow. This tool should be called after promptUserActions when the user makes a selection. Use updateGame next to reflect the result of the action.",
+            name: 'selectAction',
+            description:
+              "Process the user's selected action from the UI and continue the game flow. This tool should be called after promptUserActions when the user makes a selection. Use updateGame next to reflect the result of the action.",
             inputSchema: {
-              type: "object",
+              type: 'object',
               properties: {
-                gameId: { type: "string", description: "ID of the game" },
-                selectedOption: { type: "string", description: "The option text user selected" },
-                selectedIndex: { type: "number", description: "Index of selected option (0-based)" }
+                gameId: { type: 'string', description: 'ID of the game' },
+                selectedOption: { type: 'string', description: 'The option text user selected' },
+                selectedIndex: {
+                  type: 'number',
+                  description: 'Index of selected option (0-based)',
+                },
               },
-              required: ["gameId", "selectedOption", "selectedIndex"]
-            }
-          }
+              required: ['gameId', 'selectedOption', 'selectedIndex'],
+            },
+          },
         ],
       };
     });
+  }
+
+  /**
+   * Format a human-readable response for AI agent
+   */
+  private formatToolResponse(
+    toolName: string,
+    status: 'success' | 'error',
+    summary: string,
+    gameContext: {
+      gameId: string;
+      title?: string;
+      keyState?: string[];
+    },
+    actionTaken: string,
+    nextStep: {
+      tool: string;
+      reason: string;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      params: Record<string, any>;
+    } | null,
+    workflowPosition: string,
+    additionalNotes?: string[]
+  ): string {
+    const statusEmoji = status === 'success' ? '✅' : '❌';
+
+    let response = `${statusEmoji} ${toolName} ${status === 'success' ? 'Completed Successfully' : 'Failed'}\n\n`;
+
+    response += `📋 Game Context:\n`;
+    response += `- Game ID: ${gameContext.gameId}\n`;
+    if (gameContext.title) response += `- Title: ${gameContext.title}\n`;
+    if (gameContext.keyState) {
+      gameContext.keyState.forEach(state => (response += `- ${state}\n`));
+    }
+    response += `\n`;
+
+    response += `📝 What Happened:\n${actionTaken}\n\n`;
+
+    if (nextStep) {
+      response += `🎯 Next Step:\n`;
+      response += `Call the '${nextStep.tool}' tool with these parameters:\n`;
+      Object.entries(nextStep.params).forEach(([key, value]) => {
+        response += `- ${key}: ${JSON.stringify(value)}\n`;
+      });
+      response += `\nReason: ${nextStep.reason}\n\n`;
+    } else {
+      response += `⏸️ Status:\nWaiting for user input. No action required until player makes a selection.\n\n`;
+    }
+
+    response += `💡 Workflow: ${workflowPosition}\n`;
+
+    if (additionalNotes && additionalNotes.length > 0) {
+      response += `\n📌 Additional Notes:\n`;
+      additionalNotes.forEach(note => (response += `- ${note}\n`));
+    }
+
+    return response;
   }
 
   private async handleCreateGame(params: CreateGameParams): Promise<CallToolResult> {
@@ -245,13 +313,35 @@ class RPGMCPServer {
       throw new Error('initialStateInJson parameter is required');
     }
     const result = this.gameManager.createGame(params.initialStateInJson);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
+
+    const responseText = this.formatToolResponse(
+      'createGame',
+      'success',
+      `New game created with ID: ${result.game.gameId}`,
+      {
+        gameId: result.game.gameId,
+        title: result.game.state.title,
+        keyState: [
+          `Characters: ${result.game.state.characters?.length || 0}`,
+          `Location: ${result.game.state.world?.location || 'Unknown'}`,
+          `Created: ${result.game.createdAt.toISOString()}`,
+        ],
+      },
+      `Initialized game world with provided state including characters, world settings, and inventory.`,
+      {
+        tool: 'progressStory',
+        reason:
+          'Begin the narrative by describing the opening scene and establishing story context',
+        params: {
+          gameId: result.game.gameId,
+          progress: 'Describe the opening situation, setting, and initial scenario for the player',
         },
-      ],
+      },
+      'Step 1/5: [createGame] → progressStory → promptUserActions → selectAction → updateGame'
+    );
+
+    return {
+      content: [{ type: 'text', text: responseText }],
     };
   }
 
@@ -260,13 +350,42 @@ class RPGMCPServer {
       throw new Error('gameId, fieldSelector, and value parameters are required');
     }
     const result = this.gameManager.updateGame(params.gameId, params.fieldSelector, params.value);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
+
+    const deltas = result.game.state._pendingDeltas || [];
+    const deltaDescriptions = deltas.map(d => d.description).join('; ');
+
+    const responseText = this.formatToolResponse(
+      'updateGame',
+      'success',
+      `Updated ${params.fieldSelector} to ${JSON.stringify(params.value)}`,
+      {
+        gameId: params.gameId,
+        title: result.game.state.title,
+        keyState: [
+          `Updated field: ${params.fieldSelector}`,
+          `New value: ${JSON.stringify(params.value)}`,
+          `Pending changes: ${deltas.length}`,
+        ],
+      },
+      `Game state modified. Changes: ${deltaDescriptions || 'State updated'}`,
+      {
+        tool: 'progressStory',
+        reason: 'Narrate the consequences and outcomes of this state change in the story',
+        params: {
+          gameId: params.gameId,
+          progress: `Describe how the change to ${params.fieldSelector} affects the game world, characters, and situation`,
         },
-      ],
+      },
+      'Step 5/5: createGame → progressStory → promptUserActions → selectAction → updateGame → [progressStory]',
+      [
+        'You may call updateGame multiple times to apply multiple changes',
+        'Call progressStory after all updates to narrate the cumulative results',
+        `${deltas.length} change(s) will be displayed to player on next promptUserActions`,
+      ]
+    );
+
+    return {
+      content: [{ type: 'text', text: responseText }],
     };
   }
 
@@ -275,13 +394,73 @@ class RPGMCPServer {
       throw new Error('gameId parameter is required');
     }
     const result = this.gameManager.getGame(params.gameId);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
+
+    // Analyze state to determine next action
+    const hasStory = !!result.game.state.lastStoryProgress;
+    const hasOptions = !!result.game.state._currentOptions;
+    const hasSelection = !!result.game.state.selectedAction;
+
+    let nextStep = null;
+    if (hasOptions && !hasSelection) {
+      // Waiting for player selection
+      nextStep = null;
+    } else if (hasSelection) {
+      nextStep = {
+        tool: 'updateGame',
+        reason: `Apply consequences of selected action: "${result.game.state.selectedAction?.option}"`,
+        params: {
+          gameId: params.gameId,
+          fieldSelector: 'Determine which field to update based on the selected action',
+          value: 'Calculate new value based on action outcome',
         },
-      ],
+      };
+    } else if (hasStory) {
+      nextStep = {
+        tool: 'promptUserActions',
+        reason: 'Present choices to player based on current story state',
+        params: {
+          gameId: params.gameId,
+          options: ['Create 2-4 meaningful choices based on current situation'],
+        },
+      };
+    } else {
+      nextStep = {
+        tool: 'progressStory',
+        reason: 'Begin or advance the narrative',
+        params: {
+          gameId: params.gameId,
+          progress: 'Describe the current situation and setting',
+        },
+      };
+    }
+
+    const responseText = this.formatToolResponse(
+      'getGame',
+      'success',
+      `Retrieved game state for: ${result.game.state.title}`,
+      {
+        gameId: params.gameId,
+        title: result.game.state.title,
+        keyState: [
+          `Characters: ${result.game.state.characters?.length || 0}`,
+          `Location: ${result.game.state.world?.location || 'Unknown'}`,
+          `Story: ${result.game.state.story?.progress || 'Not started'}`,
+          `Last updated: ${result.game.updatedAt.toISOString()}`,
+        ],
+      },
+      `Retrieved complete game state for inspection. Current status: ${hasOptions ? 'Awaiting player choice' : 'Ready for progression'}`,
+      nextStep,
+      'Inspection mode - use retrieved state to determine next action',
+      [
+        'This is a read-only operation',
+        `Story progress: ${hasStory ? 'Active' : 'Not started'}`,
+        `Player options: ${hasOptions ? 'Presented' : 'None'}`,
+        `Player selection: ${hasSelection ? 'Made' : 'Pending'}`,
+      ]
+    );
+
+    return {
+      content: [{ type: 'text', text: responseText }],
     };
   }
 
@@ -290,13 +469,46 @@ class RPGMCPServer {
       throw new Error('gameId and progress parameters are required');
     }
     const result = this.gameManager.progressStory(params.gameId, params.progress);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
+
+    const deltas = result.game.state._pendingDeltas || [];
+
+    const responseText = this.formatToolResponse(
+      'progressStory',
+      'success',
+      `Story advanced: "${params.progress.substring(0, 60)}${params.progress.length > 60 ? '...' : ''}"`,
+      {
+        gameId: params.gameId,
+        title: result.game.state.title,
+        keyState: [
+          `Chapter: ${result.game.state.story?.chapter || 'N/A'}`,
+          `Location: ${result.game.state.world?.location || 'Unknown'}`,
+          `Pending deltas: ${deltas.length}`,
+        ],
+      },
+      `Narrative advanced. Current situation: "${params.progress}"`,
+      {
+        tool: 'promptUserActions',
+        reason: 'Present player with choices to respond to this situation',
+        params: {
+          gameId: params.gameId,
+          options: [
+            'Create 2-4 meaningful options that:',
+            '- React to the current situation',
+            '- Have different potential consequences',
+            '- Align with character abilities and game state',
+          ],
         },
-      ],
+      },
+      'Step 2/5: createGame → [progressStory] → promptUserActions → selectAction → updateGame',
+      [
+        'Players need choices to interact with this situation',
+        `${deltas.length} pending change(s) will be displayed in the next UI`,
+        'Ensure options are contextually relevant to the story progress',
+      ]
+    );
+
+    return {
+      content: [{ type: 'text', text: responseText }],
     };
   }
 
@@ -327,20 +539,38 @@ class RPGMCPServer {
         text: uiHtml,
         _meta: {
           title: 'RPG Game Actions',
-          description: `게임 ${params.gameId}의 액션 선택`,
+          description: `Action selection for game ${params.gameId}`,
           preferredRenderContext: 'main',
-        }
-      }
+        },
+      },
     };
 
+    const responseText = this.formatToolResponse(
+      'promptUserActions',
+      'success',
+      `Presented ${params.options.length} choices to player`,
+      {
+        gameId: params.gameId,
+        title: result.game.state.title,
+        keyState: [
+          `Situation: "${result.game.state.lastStoryProgress}"`,
+          `Options presented: ${params.options.length}`,
+          `Deltas displayed and cleared`,
+        ],
+      },
+      `Interactive UI generated with story progress and ${params.options.length} action buttons. Player can now make a selection.`,
+      null, // No next step - waiting for user
+      'Step 3/5: createGame → progressStory → [promptUserActions] → WAITING FOR USER → selectAction',
+      [
+        'PAUSED: Waiting for player to select an option via UI',
+        'selectAction will be called automatically when player clicks a button',
+        'Do not proceed until selectAction is invoked',
+        `Options: ${params.options.map((o, i) => `[${i}] ${o}`).join(', ')}`,
+      ]
+    );
+
     return {
-      content: [
-        uiResource,
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
+      content: [uiResource, { type: 'text', text: responseText }],
     };
   }
 
@@ -351,18 +581,22 @@ class RPGMCPServer {
     // 게임 상태에서 pendingDeltas 가져오기
     const game = this.gameManager.getGame(gameId).game;
     const pendingDeltas = game.state._pendingDeltas || [];
-    
+
     // Delta 섹션 HTML 생성
     const deltaSection = this.generateDeltaSection(pendingDeltas);
 
-    const optionButtons = options.map((option, index) => `
+    const optionButtons = options
+      .map(
+        (option, index) => `
       <button 
         class="action-button" 
         onclick="selectAction('${gameId}', '${option.replace(/'/g, "\\'")}', ${index})"
       >
         ${option}
       </button>
-    `).join('');
+    `
+      )
+      .join('');
 
     return `
 <!DOCTYPE html>
@@ -525,11 +759,15 @@ class RPGMCPServer {
       return '';
     }
 
-    const deltaItems = deltas.map(delta => `
+    const deltaItems = deltas
+      .map(
+        delta => `
       <div class="delta-item">
         ⚡ ${delta.description}
       </div>
-    `).join('');
+    `
+      )
+      .join('');
 
     return `
       <div class="delta-section">
@@ -543,14 +781,53 @@ class RPGMCPServer {
     if (!params.gameId || !params.selectedOption || params.selectedIndex === undefined) {
       throw new Error('gameId, selectedOption, and selectedIndex parameters are required');
     }
-    const result = this.gameManager.selectAction(params.gameId, params.selectedOption, params.selectedIndex);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
+    const result = this.gameManager.selectAction(
+      params.gameId,
+      params.selectedOption,
+      params.selectedIndex
+    );
+
+    const history = result.game.state._gameHistory || [];
+    const recentChoices = history
+      .slice(-3)
+      .map((h: GameHistoryEntry) => h.selectedOption)
+      .join(' → ');
+
+    const responseText = this.formatToolResponse(
+      'selectAction',
+      'success',
+      `Player selected: "${params.selectedOption}"`,
+      {
+        gameId: params.gameId,
+        title: result.game.state.title,
+        keyState: [
+          `Situation: "${result.game.state.lastStoryProgress}"`,
+          `Selected: [${params.selectedIndex}] "${params.selectedOption}"`,
+          `History: ${history.length}/10 entries`,
+        ],
+      },
+      `Player's choice recorded. Selection: "${params.selectedOption}" in response to situation: "${result.game.state.lastStoryProgress}"`,
+      {
+        tool: 'updateGame',
+        reason: `Apply the consequences of the selected action: "${params.selectedOption}"`,
+        params: {
+          gameId: params.gameId,
+          fieldSelector:
+            'Determine which game state field to modify (e.g., characters[0].hp, world.location, inventory)',
+          value: 'Calculate new value based on the action outcome and current game state',
         },
-      ],
+      },
+      'Step 4/5: createGame → progressStory → promptUserActions → [selectAction] → updateGame → progressStory',
+      [
+        'Determine consequences based on the selected action and current game state',
+        'You may need to call updateGame multiple times for complex outcomes',
+        'After all updates, call progressStory to narrate the results',
+        `Recent player choices: ${recentChoices || 'This is the first choice'}`,
+      ]
+    );
+
+    return {
+      content: [{ type: 'text', text: responseText }],
     };
   }
 

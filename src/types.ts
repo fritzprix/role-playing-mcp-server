@@ -14,7 +14,9 @@ export interface GameHistoryEntry {
  */
 export interface DeltaInfo {
   field: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   initialValue: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   finalValue: any;
   timestamp: Date;
   description: string;
@@ -38,6 +40,7 @@ export interface GameState {
   };
   _pendingDeltas?: DeltaInfo[]; // promptUserAction 사이의 누적 변경사항
   _lastPromptTime?: Date; // 마지막 promptUserAction 호출 시간
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any; // 유연한 구조를 위해 추가 프로퍼티 허용
 }
 
@@ -48,6 +51,7 @@ export interface Character {
   mp?: number;
   class?: string;
   favorability?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
 
@@ -55,6 +59,7 @@ export interface WorldState {
   location?: string;
   time?: string;
   weather?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
 
@@ -62,12 +67,14 @@ export interface InventoryItem {
   name: string;
   quantity?: number;
   type?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
 
 export interface StoryState {
   chapter?: number;
   progress?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
 
@@ -91,6 +98,7 @@ export interface CreateGameParams {
 export interface UpdateGameParams {
   gameId: string;
   fieldSelector: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   value: any;
 }
 

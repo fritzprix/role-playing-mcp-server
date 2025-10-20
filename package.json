@@ -19,6 +19,11 @@
     "dev": "tsc && node dist/index.js",
     "clean": "rm -rf dist",
     "type-check": "tsc --noEmit",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "check": "npm run type-check && npm run lint && npm run format:check",
     "prepublishOnly": "npm run build",
     "inspector": "./node_modules/.bin/mcp-inspector node dist/index.js",
     "inspector:dev": "tsc && ./node_modules/.bin/mcp-inspector node dist/index.js"
@@ -28,9 +33,17 @@
     "@modelcontextprotocol/sdk": "^0.5.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.38.0",
     "@modelcontextprotocol/inspector": "^0.16.6",
     "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
+    "@typescript-eslint/eslint-plugin": "^8.46.1",
+    "@typescript-eslint/parser": "^8.46.1",
+    "eslint": "^9.38.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "prettier": "^3.6.2",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.46.1"
   },
   "keywords": [
     "mcp",
