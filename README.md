@@ -15,6 +15,7 @@ The server provides 6 core tools for building and managing RPG games:
 2. **`updateGame`** - Update game state
    - Supports nested field paths (e.g., `characters[0].level`, `world.location`)
    - Real-time change tracking with Delta system
+   - **Game Over Support:** If a state update results in game over (e.g., HP reaches 0, bad ending), set `isGameOver=true` and provide a `gameOverReason`. The server will return a special Game Over UI with an empathetic explanation and suggestions for improvement.
 
 3. **`getGame`** - Retrieve current game state
    - Access complete game state at any time
@@ -24,6 +25,7 @@ The server provides 6 core tools for building and managing RPG games:
    - Manage narrative flow
 
 5. **`promptUserActions`** - Present action choices to users
+   - **Dynamic Choices:** Always present 2-4 options that mix positive and negative outcomes for dynamic, engaging gameplay. Each option should have distinct consequences and risk/reward tradeoffs.
    - Generate interactive UI
    - Web-based action selection interface
 
@@ -43,6 +45,7 @@ createGame → progressStory → promptUserActions → selectAction → updateGa
 
 - **Web-based Selection Interface**: Beautiful UI automatically generated with story progression
 - **Real-time Change Display**: Visual feedback for recent changes via Delta system
+- **Game Over Screen**: When the game ends, a special UI explains why, what could have been done differently, and encourages replay
 - **Game History**: Automatically saves last 10 situation-choice records
 
 #### Example Game Scenario
@@ -61,11 +64,18 @@ createGame → progressStory → promptUserActions → selectAction → updateGa
 // 2. Progress Story
 "Elara discovers an ancient spellbook in the academy library..."
 
-// 3. Present Choices
-["Read the spellbook", "Tell the professor", "Leave it where it is"]
+// 3. Present Choices (always mix positive/negative outcomes)
+[
+  "Read the spellbook (may gain power, but risk a curse)",
+  "Tell the professor (safe, but lose a chance for secret knowledge)",
+  "Leave it where it is (avoid risk, but miss opportunity)",
+  "Try to sell it secretly (potential reward, but risk being caught)"
+]
 
 // 4. Update game state after user selection
-"characters[0].favorability": +5
+"characters[0].hp": 0, // triggers game over
+"isGameOver": true,
+"gameOverReason": "Elara triggered a powerful curse from the spellbook and lost all HP. If you had chosen to consult the professor or left the book alone, you might have avoided this fate."
 ```
 
 ## MCP Client Requirements
