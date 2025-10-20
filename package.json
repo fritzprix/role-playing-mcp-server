@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "type": "module",
   "bin": {
-    "rpg-mcp-server": "./dist/index.js"
+    "rpg-mcp-server": "dist/index.js"
   },
   "files": [
     "dist/**/*",
@@ -25,7 +25,7 @@
     "format:check": "prettier --check \"src/**/*.ts\"",
     "check": "npm run type-check && npm run lint && npm run format:check",
     "prepublishOnly": "npm run build",
-    "inspector": "./node_modules/.bin/mcp-inspector node dist/index.js",
+    "inspector": "mcp-inspector node dist/index.js",
     "inspector:dev": "tsc && ./node_modules/.bin/mcp-inspector node dist/index.js"
   },
   "dependencies": {
@@ -58,7 +58,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/rpg-mcp-server.git"
+    "url": "git+https://github.com/your-username/rpg-mcp-server.git"
   },
   "engines": {
     "node": ">=18.0.0"
