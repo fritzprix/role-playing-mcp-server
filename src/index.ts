@@ -17,6 +17,7 @@ import {
   ErrorResponse,
   DeltaInfo,
   GameHistoryEntry,
+  GameState,
 } from './types.js';
 
 /**
@@ -142,7 +143,7 @@ class RPGMCPServer {
           {
             name: 'updateGame',
             description:
-              'Update a specific field in the game state and return the complete updated game state. Supports nested property updates using path notation. Use progressStory next to advance the narrative.',
+              'Update a specific field in the game state and return the complete updated game state. Supports nested property updates using path notation. If the update results in game over (e.g., character HP reaches 0, story reaches bad ending), set isGameOver=true. Use progressStory next to advance the narrative.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -167,6 +168,16 @@ class RPGMCPServer {
                     true,
                     null,
                   ],
+                },
+                isGameOver: {
+                  type: 'boolean',
+                  description:
+                    'Set to true if this update results in game over condition (e.g., character death, bad ending reached)',
+                },
+                gameOverReason: {
+                  type: 'string',
+                  description:
+                    'Explanation of why the game ended when isGameOver is true. Should be empathetic and include what could have been done differently.',
                 },
               },
               required: ['gameId', 'fieldSelector', 'value'],
@@ -362,6 +373,58 @@ Example: ["Approach the stranger cautiously and chat (might gather info or be de
     }
     const result = this.gameManager.updateGame(params.gameId, params.fieldSelector, params.value);
 
+    // Game Over 처리
+    if (params.isGameOver && params.gameOverReason) {
+      const gameOverHtml = this.generateGameOverUI(
+        params.gameId,
+        params.gameOverReason,
+        result.game.state
+      );
+
+      const gameOverResource = {
+        type: 'resource' as const,
+        resource: {
+          uri: `ui://rpg-game/${params.gameId}/game-over`,
+          mimeType: 'text/html',
+          text: gameOverHtml,
+          _meta: {
+            title: 'Game Over',
+            description: `Game over screen for ${params.gameId}`,
+            preferredRenderContext: 'main',
+          },
+        },
+      };
+
+      const responseText = this.formatToolResponse(
+        'updateGame',
+        'success',
+        `Game Over - ${params.gameOverReason}`,
+        {
+          gameId: params.gameId,
+          title: result.game.state.title,
+          keyState: [
+            `Updated field: ${params.fieldSelector}`,
+            `Final value: ${JSON.stringify(params.value)}`,
+            'Game Status: ENDED',
+          ],
+        },
+        `The game has ended. The story has reached its conclusion with: ${params.gameOverReason}`,
+        null, // No next step - game is over
+        'Game Over - Story Concluded',
+        [
+          '🎮 The journey has ended',
+          `Reason: ${params.gameOverReason}`,
+          'Consider starting a new game to explore different outcomes',
+          'Your choices shaped this story to its conclusion',
+        ]
+      );
+
+      return {
+        content: [gameOverResource, { type: 'text', text: responseText }],
+      };
+    }
+
+    // 정상 진행
     const deltas = result.game.state._pendingDeltas || [];
     const deltaDescriptions = deltas.map(d => d.description).join('; ');
 
@@ -762,6 +825,176 @@ Example: ["Approach the stranger cautiously and chat (might gather info or be de
             }, '*');
         }
     </script>
+</body>
+</html>`;
+  }
+
+  private generateGameOverUI(gameId: string, gameOverReason: string, gameState: GameState): string {
+    return `
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Over - ${gameId}</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: #ecf0f1;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .game-over-container {
+            background: #2c3e50;
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            border: 3px solid #e74c3c;
+            text-align: center;
+            animation: fadeIn 0.8s ease-in;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        .game-over-title {
+            font-size: 48px;
+            font-weight: bold;
+            color: #e74c3c;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            animation: blink 1.5s infinite;
+        }
+        @keyframes blink {
+            0%, 50%, 100% { opacity: 1; }
+            25%, 75% { opacity: 0.7; }
+        }
+        .game-over-reason {
+            background: #e74c3c;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 25px 0;
+            color: #ecf0f1;
+            font-size: 18px;
+            line-height: 1.8;
+            text-align: left;
+        }
+        .game-over-reason h3 {
+            color: #fff;
+            margin-top: 0;
+            font-size: 20px;
+            text-align: center;
+        }
+        .what-went-wrong {
+            background: #34495e;
+            border-left: 5px solid #e74c3c;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+            text-align: left;
+        }
+        .what-went-wrong h4 {
+            color: #e74c3c;
+            margin-top: 0;
+            font-size: 16px;
+        }
+        .how-to-prevent {
+            background: #27ae60;
+            border-left: 5px solid #2ecc71;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+            text-align: left;
+        }
+        .how-to-prevent h4 {
+            color: #2ecc71;
+            margin-top: 0;
+            font-size: 16px;
+        }
+        .final-state {
+            background: #34495e;
+            border: 1px solid #7f8c8d;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 14px;
+            color: #bdc3c7;
+            text-align: left;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .final-state h4 {
+            margin-top: 0;
+            color: #ecf0f1;
+        }
+        .retry-message {
+            color: #ecf0f1;
+            font-size: 16px;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #7f8c8d;
+        }
+        .game-id {
+            color: #95a5a6;
+            font-size: 12px;
+            text-align: center;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-over-container">
+        <div class="game-over-title">☠️ GAME OVER ☠️</div>
+        
+        <div class="game-over-reason">
+            <h3>무엇이 일어났나요?</h3>
+            <p>${gameOverReason}</p>
+        </div>
+        
+        <div class="what-went-wrong">
+            <h4>🔴 치명적 선택</h4>
+            <p>
+                게임은 모든 선택이 중요합니다. 조금 더 신중했더라면, 혹은 다른 접근 방식을 취했더라면 
+                이러한 결말을 피할 수 있었을지도 모릅니다. 
+                <br/><br/>
+                당신의 결정들이 쌓여 이 순간을 만들었습니다.
+            </p>
+        </div>
+        
+        <div class="how-to-prevent">
+            <h4>💡 다음엔 이렇게 해보세요</h4>
+            <p>
+                • 선택지들의 다양한 결과를 미리 생각해보기<br/>
+                • 긍정적인 선택과 부정적인 선택의 균형 유지<br/>
+                • 캐릭터의 능력과 상태를 고려한 전략 수립<br/>
+                • 위험한 선택과 안전한 선택 사이의 균형<br/>
+                • 게임 상태를 자주 확인하며 조기 경고 감지하기
+            </p>
+        </div>
+        
+        <div class="final-state">
+            <h4>최종 게임 상태</h4>
+            <pre>${JSON.stringify(gameState, null, 2)}</pre>
+        </div>
+        
+        <div class="retry-message">
+            🎮 새로운 게임으로 다시 시작하고, 다른 선택들을 시도해보세요!
+        </div>
+        
+        <div class="game-id">Game ID: ${gameId}</div>
+    </div>
 </body>
 </html>`;
   }

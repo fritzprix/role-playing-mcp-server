@@ -100,6 +100,8 @@ export interface UpdateGameParams {
   fieldSelector: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   value: any;
+  isGameOver?: boolean; // Set to true if this update results in game over
+  gameOverReason?: string; // Explanation of why the game ended
 }
 
 export interface GetGameParams {
