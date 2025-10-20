@@ -113,7 +113,7 @@ export interface ProgressStoryParams {
 
 export interface PromptUserActionsParams {
   gameId: string;
-  options: string[];
+  options: string[]; // 2-4 meaningful options that mix positive and negative outcomes
 }
 
 export interface SelectActionParams {

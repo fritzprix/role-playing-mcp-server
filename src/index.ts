@@ -209,8 +209,13 @@ class RPGMCPServer {
           },
           {
             name: 'promptUserActions',
-            description:
-              'Present the user with available action options. This tool should be called after progressStory to complete the story cycle and wait for user input. Use selectAction next after the user selects an option.',
+            description: `Present the user with 2-4 meaningful action options that MIX POSITIVE AND NEGATIVE OUTCOMES for dynamic, engaging gameplay. Each option should offer distinct consequences and risk/reward tradeoffs. This tool should be called after progressStory to complete the story cycle and wait for user input. Use selectAction next after the user selects an option.
+
+IMPORTANT: Create options that vary in approach and consequences:
+- Include both favorable and unfavorable outcome possibilities
+- Offer cautious vs risky strategies
+- Provide different character alignment choices
+- Ensure options feel contextually relevant to the current situation`,
             inputSchema: {
               type: 'object',
               properties: {
@@ -221,9 +226,15 @@ class RPGMCPServer {
                 options: {
                   type: 'array',
                   items: { type: 'string' },
-                  description:
-                    'List of available user action options. Must contain at least one option.',
-                  minItems: 1,
+                  description: `List of 2-4 action options with mixed positive/negative consequences. Each option should:
+- React to the current story situation
+- Have distinct potential outcomes (some favorable, some risky/unfavorable)
+- Range from cautious to daring approaches
+- Align with character abilities and game state
+
+Example: ["Approach the stranger cautiously and chat (might gather info or be deceived)", "Attack preemptively (risky but decisive)", "Search for another route (safer but takes time)", "Hide and observe (tactical but limits information)"]`,
+                  minItems: 2,
+                  maxItems: 4,
                 },
               },
               required: ['gameId', 'options'],
@@ -488,22 +499,26 @@ class RPGMCPServer {
       `Narrative advanced. Current situation: "${params.progress}"`,
       {
         tool: 'promptUserActions',
-        reason: 'Present player with choices to respond to this situation',
+        reason:
+          'Present player with 2-4 choices that mix positive and negative outcomes for dynamic gameplay',
         params: {
           gameId: params.gameId,
           options: [
             'Create 2-4 meaningful options that:',
+            '- MIX positive AND negative outcomes (risk/reward tradeoffs)',
+            '- Offer both cautious AND daring approaches',
+            '- Include favorable and unfavorable possibilities',
             '- React to the current situation',
-            '- Have different potential consequences',
             '- Align with character abilities and game state',
           ],
         },
       },
       'Step 2/5: createGame → [progressStory] → promptUserActions → selectAction → updateGame',
       [
-        'Players need choices to interact with this situation',
+        'Players need diverse choices with varying consequences for engaging gameplay',
         `${deltas.length} pending change(s) will be displayed in the next UI`,
-        'Ensure options are contextually relevant to the story progress',
+        'Ensure options provide both safe and risky alternatives',
+        'Avoid making all options have similar outcomes',
       ]
     );
 
@@ -548,7 +563,7 @@ class RPGMCPServer {
     const responseText = this.formatToolResponse(
       'promptUserActions',
       'success',
-      `Presented ${params.options.length} choices to player`,
+      `Presented ${params.options.length} choices to player with mixed outcomes`,
       {
         gameId: params.gameId,
         title: result.game.state.title,
@@ -558,14 +573,14 @@ class RPGMCPServer {
           `Deltas displayed and cleared`,
         ],
       },
-      `Interactive UI generated with story progress and ${params.options.length} action buttons. Player can now make a selection.`,
+      `Interactive UI generated with story progress and ${params.options.length} action buttons. Options mix positive and negative outcomes for dynamic gameplay. Player can now make a selection.`,
       null, // No next step - waiting for user
       'Step 3/5: createGame → progressStory → [promptUserActions] → WAITING FOR USER → selectAction',
       [
         'PAUSED: Waiting for player to select an option via UI',
         'selectAction will be called automatically when player clicks a button',
         'Do not proceed until selectAction is invoked',
-        `Options: ${params.options.map((o, i) => `[${i}] ${o}`).join(', ')}`,
+        `Options presented: ${params.options.map((o, i) => `[${i}] ${o}`).join('; ')}`,
       ]
     );
 
