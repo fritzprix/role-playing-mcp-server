@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@mcp-ui/server": "^5.10.0",
-    "@modelcontextprotocol/sdk": "^0.5.0"
+    "@modelcontextprotocol/sdk": "1.20.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.38.0",
