@@ -365,12 +365,14 @@ window.addEventListener('message', (event) => {
 ## 📋 체크리스트
 
 ### MCP 서버 개발자
+
 - [ ] UI Resource 생성 로직 구현
 - [ ] 적절한 MIME Type 선택
 - [ ] URI 네이밍 규칙 정의
 - [ ] 사용자 액션에 대한 응답 로직
 
 ### MCP 클라이언트 개발자  
+
 - [ ] UIResourceRenderer 컴포넌트 통합
 - [ ] 5가지 액션 타입 처리 로직 구현
 - [ ] 비동기 메시지 추적 시스템 (messageId)
@@ -378,6 +380,7 @@ window.addEventListener('message', (event) => {
 - [ ] 에러 처리 및 사용자 피드백
 
 ### 공통
+
 - [ ] UI와 비즈니스 로직 분리
 - [ ] 적절한 로딩 상태 처리
 - [ ] 접근성 고려사항

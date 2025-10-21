@@ -124,6 +124,10 @@ export interface SelectActionParams {
   selectedIndex: number;
 }
 
+export interface SelectRestartParams {
+  gameId: string;
+}
+
 /**
  * 게임 응답 타입 - nextActions를 포함
  */

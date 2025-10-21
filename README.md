@@ -6,7 +6,7 @@ An immersive Role-Playing Game server built on the Model Context Protocol (MCP),
 
 ### 🎮 Game Tools
 
-The server provides 6 core tools for building and managing RPG games:
+The server provides 7 core tools for building and managing RPG games:
 
 1. **`createGame`** - Initialize a new RPG game
    - Set up initial game state (characters, world, inventory, etc.)
@@ -33,6 +33,11 @@ The server provides 6 core tools for building and managing RPG games:
    - Apply chosen actions to game state
    - Automatically record game history
 
+7. **`selectRestart`** - Restart the game after game over
+   - Called when player clicks Restart button on Game Over screen
+   - Provides game summary and context for creating a new game
+   - AI agent receives guidance to create a contextually relevant new adventure
+
 ### 🎯 User Interaction
 
 #### Basic Game Flow
@@ -41,12 +46,30 @@ The server provides 6 core tools for building and managing RPG games:
 createGame → progressStory → promptUserActions → selectAction → updateGame → progressStory → ...
 ```
 
+#### Game Over & Restart Flow
+
+When a game ends (e.g., character HP reaches 0 or story reaches an ending):
+
+```text
+updateGame (isGameOver=true) → Game Over UI displayed →
+User clicks Restart button → selectRestart →
+AI creates new game with context → progressStory → ...
+```
+
+The restart flow includes:
+
+- **Context Preservation**: Previous game summary is provided to the AI
+- **AI-Suggested Continuation**: AI can create thematically related or evolved adventures
+- **One-Click Restart**: No manual intervention needed from the player
+- **Empathetic Messaging**: Game Over screen explains what happened and suggests improvements
+
 #### Interactive UI
 
 - **Web-based Selection Interface**: Beautiful UI automatically generated with story progression
 - **Real-time Change Display**: Visual feedback for recent changes via Delta system
-- **Game Over Screen**: When the game ends, a special UI explains why, what could have been done differently, and encourages replay
+- **Game Over Screen**: When the game ends, a special UI explains why, what could have been done differently, and includes a Restart button
 - **Game History**: Automatically saves last 10 situation-choice records
+- **Restart Button**: Interactive button on Game Over screen that triggers `selectRestart` tool
 
 #### Example Game Scenario
 
@@ -168,4 +191,3 @@ npm run inspector
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
-

@@ -86,6 +86,7 @@ It accepts the following props:
 
 - **`resource`**: The resource object from an MCP Tool response. It must include `uri`, `mimeType`, and content (`text`, `blob`)
 - **`onUIAction`**: Optional callback for handling UI actions from the resource:
+
   ```typescript
   { type: 'tool', payload: { toolName: string, params: Record<string, unknown> }, messageId?: string } |
   { type: 'intent', payload: { intent: string, params: Record<string, unknown> }, messageId?: string } |
@@ -93,6 +94,7 @@ It accepts the following props:
   { type: 'notify', payload: { message: string }, messageId?: string } |
   { type: 'link', payload: { url: string }, messageId?: string }
   ```
+
   When actions include a `messageId`, the iframe automatically receives response messages for asynchronous handling.
 - **`supportedContentTypes`**: Optional array to restrict which content types are allowed (`['rawHtml', 'externalUrl', 'remoteDom']`)
 - **`htmlProps`**: Optional props for the internal `<HTMLResourceRenderer>`
