@@ -51,6 +51,7 @@ Together, they let you define reusable UI snippets on the server side, seamlessl
 In essence, by using `mcp-ui` SDKs, servers and hosts can agree on contracts that enable them to create and render interactive UI snippets (as a path to a standardized UI approach in MCP).
 
 ### UI Resource
+
 The primary payload returned from the server to the client is the `UIResource`:
 
 ```ts
@@ -80,8 +81,9 @@ It is available as a React component and as a Web Component.
 **React Component**
 
 It accepts the following props:
-- **`resource`**: The resource object from an MCP Tool response. It must include `uri`, `mimeType`, and content (`text`, `blob`)
-- **`onUIAction`**: Optional callback for handling UI actions from the resource:
+* **`resource`**: The resource object from an MCP Tool response. It must include `uri`, `mimeType`, and content (`text`, `blob`)
+* **`onUIAction`**: Optional callback for handling UI actions from the resource:
+
   ```typescript
   { type: 'tool', payload: { toolName: string, params: Record<string, unknown> }, messageId?: string } |
   { type: 'intent', payload: { intent: string, params: Record<string, unknown> }, messageId?: string } |
@@ -89,22 +91,24 @@ It accepts the following props:
   { type: 'notify', payload: { message: string }, messageId?: string } |
   { type: 'link', payload: { url: string }, messageId?: string }
   ```
+
   When actions include a `messageId`, the iframe automatically receives response messages for asynchronous handling.
-- **`supportedContentTypes`**: Optional array to restrict which content types are allowed (`['rawHtml', 'externalUrl', 'remoteDom']`)
-- **`htmlProps`**: Optional props for the internal `<HTMLResourceRenderer>`
-  - **`style`**: Optional custom styles for the iframe
-  - **`iframeProps`**: Optional props passed to the iframe element
-  - **`iframeRenderData`**: Optional `Record<string, unknown>` to pass data to the iframe upon rendering. This enables advanced use cases where the parent application needs to provide initial state or configuration to the sandboxed iframe content.
-  - **`autoResizeIframe`**: Optional `boolean | { width?: boolean; height?: boolean }` to automatically resize the iframe to the size of the content.
-- **`remoteDomProps`**: Optional props for the internal `<RemoteDOMResourceRenderer>`
-  - **`library`**: Optional component library for Remote DOM resources (defaults to `basicComponentLibrary`)
-  - **`remoteElements`**: remote element definitions for Remote DOM resources.
+* **`supportedContentTypes`**: Optional array to restrict which content types are allowed (`['rawHtml', 'externalUrl', 'remoteDom']`)
+* **`htmlProps`**: Optional props for the internal `<HTMLResourceRenderer>`
+  * **`style`**: Optional custom styles for the iframe
+  * **`iframeProps`**: Optional props passed to the iframe element
+  * **`iframeRenderData`**: Optional `Record<string, unknown>` to pass data to the iframe upon rendering. This enables advanced use cases where the parent application needs to provide initial state or configuration to the sandboxed iframe content.
+  * **`autoResizeIframe`**: Optional `boolean | { width?: boolean; height?: boolean }` to automatically resize the iframe to the size of the content.
+* **`remoteDomProps`**: Optional props for the internal `<RemoteDOMResourceRenderer>`
+  * **`library`**: Optional component library for Remote DOM resources (defaults to `basicComponentLibrary`)
+  * **`remoteElements`**: remote element definitions for Remote DOM resources.
 
 **Web Component**
 
 The Web Component is available as `<ui-resource-renderer>`. It accepts the same props as the React component, but they must be passed as strings.
 
 Example:
+
 ```html
 <ui-resource-renderer
   resource='{ "mimeType": "text/html", "text": "<h2>Hello from the Web Component!</h2>" }'
@@ -112,6 +116,7 @@ Example:
 ```
 
 The `onUIAction` prop can be handled by attaching an event listener to the component:
+
 ```javascript
 const renderer = document.querySelector('ui-resource-renderer');
 renderer.addEventListener('onUIAction', (event) => {
@@ -127,9 +132,9 @@ The Web Component is available in the `@mcp-ui/client` package at `dist/ui-resou
 
 Rendered using the internal `<HTMLResourceRenderer />` component, which displays content inside an `<iframe>`. This is suitable for self-contained HTML or embedding external apps.
 
-*   **`mimeType`**:
-    *   `text/html`: Renders inline HTML content.
-    *   `text/uri-list`: Renders an external URL. MCP-UI uses the first valid `http/s` URL.
+* **`mimeType`**:
+  * `text/html`: Renders inline HTML content.
+  * `text/uri-list`: Renders an external URL. MCP-UI uses the first valid `http/s` URL.
 
 #### Remote DOM (`application/vnd.mcp-ui.remote-dom`)
 
@@ -164,7 +169,7 @@ gem install mcp_ui_server
 
 ## 🚀 Getting Started
 
-You can use [GitMCP](https://gitmcp.io/idosal/mcp-ui) to give your IDE access to `mcp-ui`'s latest documentation! 
+You can use [GitMCP](https://gitmcp.io/idosal/mcp-ui) to give your IDE access to `mcp-ui`'s latest documentation!
 
 ### TypeScript
 
@@ -279,20 +284,22 @@ You can use [GitMCP](https://gitmcp.io/idosal/mcp-ui) to give your IDE access to
 
 For a detailed, simple, step-by-step guide on how to integrate `mcp-ui` into your own server, check out the full server walkthroughs on the [mcp-ui documentation site](https://mcpui.dev):
 
-- **[TypeScript Server Walkthrough](https://mcpui.dev/guide/server/typescript/walkthrough)**
-- **[Ruby Server Walkthrough](https://mcpui.dev/guide/server/ruby/walkthrough)**
+* **[TypeScript Server Walkthrough](https://mcpui.dev/guide/server/typescript/walkthrough)**
+* **[Ruby Server Walkthrough](https://mcpui.dev/guide/server/ruby/walkthrough)**
 
 These guides will show you how to add a `mcp-ui` endpoint to an existing server, create tools that return UI resources, and test your setup with the `ui-inspector`!
 
 ## 🌍 Examples
 
 **Client Examples**
+
 * [ui-inspector](https://github.com/idosal/ui-inspector) - inspect local `mcp-ui`-enabled servers.
 * [MCP-UI Chat](https://github.com/idosal/scira-mcp-ui-chat) - interactive chat built with the `mcp-ui` client. Check out the [hosted version](https://scira-mcp-chat-git-main-idosals-projects.vercel.app/)!
 * MCP-UI RemoteDOM Playground (`examples/remote-dom-demo`) - local demo app to test RemoteDOM resources (intended for hosts)
 * MCP-UI Web Component Demo (`examples/wc-demo`) - local demo app to test the Web Component
 
 **Server Examples**
+
 * **TypeScript**: A [full-featured server](examples/server) that is deployed to a hosted environment for easy testing.
   * **[`typescript-server-demo`](./examples/typescript-server-demo)**: A simple Typescript server that demonstrates how to generate UI resources.
   * **server**: A [full-featured Typescript server](examples/server) that is deployed to a hosted Cloudflare environment for easy testing.
@@ -315,33 +322,33 @@ Drop those URLs into any MCP-compatible host to see `mcp-ui` in action. For a su
 | [VSCode](https://github.com/microsoft/vscode/issues/260218) (TBA)    |    ?    |    ?     |
 
 **Legend:**
-- ✅: Supported
-- ⚠️: Partial Support
-- ❌: Not Supported (yet)
+* ✅: Supported
+* ⚠️: Partial Support
+* ❌: Not Supported (yet)
 
 ## 🔒 Security
-Host and user security is one of `mcp-ui`'s primary concerns. In all content types, the remote code is executed in a sandboxed iframe.
 
+Host and user security is one of `mcp-ui`'s primary concerns. In all content types, the remote code is executed in a sandboxed iframe.
 
 ## 🛣️ Roadmap
 
-- [X] Add online playground
-- [X] Expand UI Action API (beyond tool calls)
-- [X] Support Web Components
-- [X] Support Remote-DOM
-- [ ] Add component libraries (in progress)
-- [ ] Add SDKs for additional programming languages (in progress; Ruby available)
-- [ ] Support additional frontend frameworks
-- [ ] Add declarative UI content type
-- [ ] Support generative UI?
-      
+* [X] Add online playground
+* [X] Expand UI Action API (beyond tool calls)
+* [X] Support Web Components
+* [X] Support Remote-DOM
+* [ ] Add component libraries (in progress)
+* [ ] Add SDKs for additional programming languages (in progress; Ruby available)
+* [ ] Support additional frontend frameworks
+* [ ] Add declarative UI content type
+* [ ] Support generative UI?
+
 ## Core Team
+
 `mcp-ui` is a project by [Ido Salomon](https://x.com/idosal1), in collaboration with [Liad Yosef](https://x.com/liadyosef).
 
 ## 🤝 Contributing
 
 Contributions, ideas, and bug reports are welcome! See the [contribution guidelines](https://github.com/idosal/mcp-ui/blob/main/.github/CONTRIBUTING.md) to get started.
-
 
 ## 📄 License
 

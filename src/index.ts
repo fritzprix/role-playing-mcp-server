@@ -14,6 +14,7 @@ import {
   ProgressStoryParams,
   PromptUserActionsParams,
   SelectActionParams,
+  SelectRestartParams,
   ErrorResponse,
   DeltaInfo,
   GameHistoryEntry,
@@ -43,6 +44,31 @@ class RPGMCPServer {
 
     this.gameManager = new GameManager();
     this.setupHandlers();
+  }
+
+  /**
+   * HTML 이스케이프 - XSS 방지
+   */
+  private escapeHtml(input: unknown): string {
+    const s = String(input ?? '');
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  /**
+   * 게임 상태 요약 생성
+   */
+  private generateGameStateSummary(state: GameState): string {
+    return `
+      <div class="state-item">👤 Characters: ${state.characters?.length || 0}</div>
+      <div class="state-item">📍 Location: ${this.escapeHtml(state.world?.location || 'Unknown')}</div>
+      <div class="state-item">📖 Story: ${this.escapeHtml(state.story?.progress || 'N/A')}</div>
+      <div class="state-item">🎒 Items: ${state.inventory?.length || 0}</div>
+    `;
   }
 
   private setupHandlers(): void {
@@ -76,6 +102,9 @@ class RPGMCPServer {
             break;
           case 'selectAction':
             result = await this.handleSelectAction(toolArgs as unknown as SelectActionParams);
+            break;
+          case 'selectRestart':
+            result = await this.handleSelectRestart(toolArgs as unknown as SelectRestartParams);
             break;
           default:
             throw new Error(`Unknown tool: ${toolName}`);
@@ -266,6 +295,21 @@ Example: ["Approach the stranger cautiously and chat (might gather info or be de
                 },
               },
               required: ['gameId', 'selectedOption', 'selectedIndex'],
+            },
+          },
+          {
+            name: 'selectRestart',
+            description:
+              'Restart the game after game over. Retrieves final game state summary and instructs to create a new game. This should be called when the player clicks the Restart button on the Game Over screen.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                gameId: {
+                  type: 'string',
+                  description: 'ID of the ended game',
+                },
+              },
+              required: ['gameId'],
             },
           },
         ],
@@ -663,17 +707,24 @@ Example: ["Approach the stranger cautiously and chat (might gather info or be de
     // Delta 섹션 HTML 생성
     const deltaSection = this.generateDeltaSection(pendingDeltas);
 
+    // XSS 방지를 위한 안전한 값 처리
+    const safeGameId = this.escapeHtml(gameId);
+    const safeStoryProgress = this.escapeHtml(storyProgress);
+
     const optionButtons = options
-      .map(
-        (option, index) => `
+      .map((option, index) => {
+        const safeOption = this.escapeHtml(option);
+        return `
       <button 
-        class="action-button" 
-        onclick="selectAction('${gameId}', '${option.replace(/'/g, "\\'")}', ${index})"
+        class="action-button"
+        data-gameid="${safeGameId}"
+        data-option="${safeOption}"
+        data-index="${index}"
       >
-        ${option}
+        ${safeOption}
       </button>
-    `
-      )
+    `;
+      })
       .join('');
 
     return `
@@ -682,21 +733,31 @@ Example: ["Approach the stranger cautiously and chat (might gather info or be de
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RPG Game - ${gameId}</title>
+    <title>RPG Game</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
         body {
             font-family: 'Arial', sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: #333;
-            min-height: 100vh;
+            overflow-x: hidden;
+            padding: 10px;
         }
         .game-container {
+            width: 100%;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 20px;
             background: white;
             border-radius: 15px;
-            padding: 30px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
         .story-section {
@@ -707,6 +768,8 @@ Example: ["Approach the stranger cautiously and chat (might gather info or be de
             border-radius: 5px;
             font-size: 16px;
             line-height: 1.6;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         .actions-section h3 {
             color: #667eea;
@@ -773,13 +836,30 @@ Example: ["Approach the stranger cautiously and chat (might gather info or be de
             font-size: 12px;
             text-align: center;
             margin-top: 20px;
+            word-break: break-all;
+        }
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+            .game-container {
+                padding: 15px;
+            }
+            .story-section {
+                padding: 15px;
+                font-size: 14px;
+            }
+            .action-button {
+                padding: 12px 15px;
+                font-size: 14px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="game-container">
         <div class="story-section">
-            ${storyProgress}
+            ${safeStoryProgress}
         </div>
         
         ${deltaSection}
@@ -789,71 +869,84 @@ Example: ["Approach the stranger cautiously and chat (might gather info or be de
             ${optionButtons}
         </div>
         
-        <div class="game-id">Game ID: ${gameId}</div>
+        <div class="game-id">Game ID: ${safeGameId}</div>
     </div>
 
     <script>
-        function selectAction(gameId, selectedOption, selectedIndex) {
-            // MCP 도구 호출을 시뮬레이션
-            const result = {
-                tool: 'selectAction',
-                params: {
-                    gameId: gameId,
-                    selectedOption: selectedOption,
-                    selectedIndex: selectedIndex
-                },
-                timestamp: new Date().toISOString()
-            };
-            
-            // 선택된 버튼 하이라이트
+        (function() {
             const buttons = document.querySelectorAll('.action-button');
-            buttons.forEach(btn => btn.style.opacity = '0.5');
-            buttons[selectedIndex].style.opacity = '1';
-            buttons[selectedIndex].style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
-            
-            // MCP 도구 호출을 위한 postMessage
-            window.parent.postMessage({
-              type: 'tool',
-              payload: {
-                toolName: 'selectAction',
-                params: {
-                  gameId: gameId,
-                  selectedOption: selectedOption,
-                  selectedIndex: selectedIndex
-                }
-              }
-            }, '*');
-        }
+            buttons.forEach(function(btn) {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const gameId = btn.dataset.gameid;
+                    const selectedOption = btn.dataset.option;
+                    const selectedIndex = parseInt(btn.dataset.index, 10);
+                    
+                    // 선택된 버튼 하이라이트
+                    buttons.forEach(b => b.style.opacity = '0.5');
+                    btn.style.opacity = '1';
+                    btn.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+                    
+                    // MCP 도구 호출을 위한 postMessage
+                    window.parent.postMessage({
+                        type: 'tool',
+                        payload: {
+                            toolName: 'selectAction',
+                            params: {
+                                gameId: gameId,
+                                selectedOption: selectedOption,
+                                selectedIndex: selectedIndex
+                            }
+                        }
+                    }, '*');
+                });
+            });
+        })();
     </script>
 </body>
 </html>`;
   }
 
   private generateGameOverUI(gameId: string, gameOverReason: string, gameState: GameState): string {
+    const safeGameId = this.escapeHtml(gameId);
+    const safeReason = this.escapeHtml(gameOverReason);
+    const safeJsonSummary = this.generateGameStateSummary(gameState);
+    const safeJsonFull = this.escapeHtml(JSON.stringify(gameState, null, 2));
+
     return `
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game Over - ${gameId}</title>
+    <title>Game Over</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
         body {
             font-family: 'Arial', sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
             background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
             color: #ecf0f1;
-            min-height: 100vh;
+            overflow-x: hidden;
+            padding: 10px;
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start;
         }
         .game-over-container {
+            width: 100%;
+            max-width: 600px;
+            margin-top: 20px;
+            padding: 20px;
             background: #2c3e50;
             border-radius: 15px;
-            padding: 40px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.5);
             border: 3px solid #e74c3c;
             text-align: center;
@@ -884,73 +977,130 @@ Example: ["Approach the stranger cautiously and chat (might gather info or be de
         .game-over-reason {
             background: #e74c3c;
             border-radius: 10px;
-            padding: 25px;
-            margin: 25px 0;
+            padding: 15px;
+            margin: 15px 0;
             color: #ecf0f1;
-            font-size: 18px;
-            line-height: 1.8;
+            font-size: 16px;
+            line-height: 1.6;
             text-align: left;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         .game-over-reason h3 {
             color: #fff;
-            margin-top: 0;
-            font-size: 20px;
+            margin: 0 0 10px 0;
+            font-size: 18px;
             text-align: center;
         }
-        .what-went-wrong {
-            background: #34495e;
-            border-left: 5px solid #e74c3c;
-            padding: 20px;
-            margin: 20px 0;
-            border-radius: 5px;
-            text-align: left;
-        }
-        .what-went-wrong h4 {
-            color: #e74c3c;
-            margin-top: 0;
-            font-size: 16px;
-        }
-        .how-to-prevent {
-            background: #27ae60;
-            border-left: 5px solid #2ecc71;
-            padding: 20px;
-            margin: 20px 0;
-            border-radius: 5px;
-            text-align: left;
-        }
-        .how-to-prevent h4 {
-            color: #2ecc71;
-            margin-top: 0;
-            font-size: 16px;
-        }
-        .final-state {
+        .final-state-summary {
             background: #34495e;
             border: 1px solid #7f8c8d;
             border-radius: 8px;
-            padding: 15px;
-            margin: 20px 0;
-            font-size: 14px;
+            padding: 12px;
+            margin: 15px 0;
+            font-size: 13px;
             color: #bdc3c7;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
             text-align: left;
-            max-height: 200px;
-            overflow-y: auto;
         }
-        .final-state h4 {
-            margin-top: 0;
-            color: #ecf0f1;
+        .state-item {
+            padding: 5px;
+        }
+        details {
+            margin: 15px 0;
+            text-align: left;
+        }
+        details summary {
+            cursor: pointer;
+            color: #2ecc71;
+            font-weight: bold;
+            user-select: none;
+            padding: 5px;
+        }
+        details summary:hover {
+            color: #27ae60;
+        }
+        .final-state-content {
+            background: #1a252f;
+            border: 1px solid #555;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 10px;
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 250px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 12px;
+            line-height: 1.4;
         }
         .retry-message {
             color: #ecf0f1;
-            font-size: 16px;
-            margin-top: 30px;
-            padding-top: 20px;
+            font-size: 14px;
+            margin-top: 15px;
+            padding-top: 15px;
             border-top: 1px solid #7f8c8d;
+        }
+        .restart-button-section {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .restart-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .restart-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.6);
+        }
+        .restart-button:active {
+            transform: translateY(0);
+        }
+        .restart-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
         .game-id {
             color: #95a5a6;
-            font-size: 12px;
+            font-size: 11px;
             text-align: center;
-            margin-top: 20px;
+            margin-top: 15px;
+            word-break: break-all;
+        }
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+            .game-over-container {
+                padding: 15px;
+                margin-top: 10px;
+            }
+            .game-over-title {
+                font-size: 32px;
+                margin-bottom: 10px;
+            }
+            .game-over-reason {
+                padding: 12px;
+                font-size: 14px;
+            }
+            .final-state-summary {
+                grid-template-columns: 1fr;
+                font-size: 12px;
+            }
+            .restart-button {
+                padding: 10px 20px;
+                font-size: 14px;
+            }
         }
     </style>
 </head>
@@ -960,41 +1110,64 @@ Example: ["Approach the stranger cautiously and chat (might gather info or be de
         
         <div class="game-over-reason">
             <h3>무엇이 일어났나요?</h3>
-            <p>${gameOverReason}</p>
+            <p>${safeReason}</p>
         </div>
         
-        <div class="what-went-wrong">
-            <h4>🔴 치명적 선택</h4>
-            <p>
-                게임은 모든 선택이 중요합니다. 조금 더 신중했더라면, 혹은 다른 접근 방식을 취했더라면 
-                이러한 결말을 피할 수 있었을지도 모릅니다. 
-                <br/><br/>
-                당신의 결정들이 쌓여 이 순간을 만들었습니다.
-            </p>
+        <div class="final-state-summary">
+            ${safeJsonSummary}
         </div>
-        
-        <div class="how-to-prevent">
-            <h4>💡 다음엔 이렇게 해보세요</h4>
-            <p>
-                • 선택지들의 다양한 결과를 미리 생각해보기<br/>
-                • 긍정적인 선택과 부정적인 선택의 균형 유지<br/>
-                • 캐릭터의 능력과 상태를 고려한 전략 수립<br/>
-                • 위험한 선택과 안전한 선택 사이의 균형<br/>
-                • 게임 상태를 자주 확인하며 조기 경고 감지하기
-            </p>
-        </div>
-        
-        <div class="final-state">
-            <h4>최종 게임 상태</h4>
-            <pre>${JSON.stringify(gameState, null, 2)}</pre>
-        </div>
+
+        <details>
+            <summary>� 전체 게임 상태 보기</summary>
+            <div class="final-state-content">${safeJsonFull}</div>
+        </details>
         
         <div class="retry-message">
             🎮 새로운 게임으로 다시 시작하고, 다른 선택들을 시도해보세요!
         </div>
-        
-        <div class="game-id">Game ID: ${gameId}</div>
+
+        <div class="restart-button-section">
+            <button 
+                id="restart-btn"
+                class="restart-button"
+                data-gameid="${safeGameId}"
+                type="button"
+                aria-label="게임 재시작"
+            >
+                🔄 Restart Game
+            </button>
+        </div>
+
+        <div class="game-id">Game ID: ${safeGameId}</div>
     </div>
+
+    <script>
+        (function() {
+            const btn = document.getElementById('restart-btn');
+            if (!btn) return;
+            
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const gameId = btn.dataset.gameid;
+                
+                window.parent.postMessage({
+                    type: 'tool',
+                    payload: {
+                        toolName: 'selectRestart',
+                        params: { gameId }
+                    }
+                }, '*');
+                
+                btn.disabled = true;
+                btn.textContent = '🔄 Restarting...';
+                btn.style.opacity = '0.6';
+                btn.setAttribute('aria-busy', 'true');
+            });
+            
+            // 접근성: 포커스 자동 설정
+            btn.focus();
+        })();
+    </script>
 </body>
 </html>`;
   }
@@ -1011,7 +1184,7 @@ Example: ["Approach the stranger cautiously and chat (might gather info or be de
       .map(
         delta => `
       <div class="delta-item">
-        ⚡ ${delta.description}
+        ⚡ ${this.escapeHtml(delta.description)}
       </div>
     `
       )
@@ -1071,6 +1244,62 @@ Example: ["Approach the stranger cautiously and chat (might gather info or be de
         'You may need to call updateGame multiple times for complex outcomes',
         'After all updates, call progressStory to narrate the results',
         `Recent player choices: ${recentChoices || 'This is the first choice'}`,
+      ]
+    );
+
+    return {
+      content: [{ type: 'text', text: responseText }],
+    };
+  }
+
+  private async handleSelectRestart(params: SelectRestartParams): Promise<CallToolResult> {
+    if (!params.gameId) {
+      throw new Error('gameId parameter is required');
+    }
+
+    const result = this.gameManager.getGame(params.gameId);
+
+    // 최종 상태 요약
+    const finalState = {
+      title: result.game.state.title,
+      endedAt: result.game.updatedAt,
+      characters: result.game.state.characters,
+      world: result.game.state.world,
+      finalProgress: result.game.state.lastStoryProgress,
+      historyCount: result.game.state.gameHistory?.length || 0,
+    };
+
+    const responseText = this.formatToolResponse(
+      'selectRestart',
+      'success',
+      'Player requested game restart',
+      {
+        gameId: params.gameId,
+        title: result.game.state.title,
+        keyState: [
+          `Game ended at: ${result.game.updatedAt.toISOString()}`,
+          `Total decisions made: ${finalState.historyCount}`,
+          'Ready to start fresh',
+        ],
+      },
+      `Game "${result.game.state.title}" has ended. Player wants to start a new adventure.`,
+      {
+        tool: 'createGame',
+        reason: 'Create a fresh game with new initial state for the player',
+        params: {
+          initialStateInJson: {
+            title: 'Suggest a new adventure based on the previous game experience',
+            characters: 'Create new characters (can reference previous if helpful)',
+            world: 'Design a new world and starting situation',
+          },
+        },
+      },
+      'Restart Flow: Game Over → [selectRestart] → createGame → progressStory',
+      [
+        'Previous game summary provided for context',
+        'Player is ready for a new adventure',
+        'Consider lessons learned from previous game when creating new one',
+        `Previous game had ${finalState.historyCount} story decisions`,
       ]
     );
 

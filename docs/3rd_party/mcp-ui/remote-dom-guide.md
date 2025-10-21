@@ -6,10 +6,10 @@ This approach offers greater flexibility and security compared to `<iframe>`-bas
 
 ## How It Works
 
-1.  The MCP server sends a resource containing a script that builds a "remote" DOM structure.
-2.  The `@mcp-ui/client` securely executes this script in a sandboxed environment (a Web Worker inside an iframe).
-3.  As the remote DOM is manipulated, a series a JSON messages describing the changes are sent to the host window.
-4.  `<RemoteDOMResourceRenderer />` receives these messages and translates them into React component tree updates.
+1. The MCP server sends a resource containing a script that builds a "remote" DOM structure.
+2. The `@mcp-ui/client` securely executes this script in a sandboxed environment (a Web Worker inside an iframe).
+3. As the remote DOM is manipulated, a series a JSON messages describing the changes are sent to the host window.
+4. `<RemoteDOMResourceRenderer />` receives these messages and translates them into React component tree updates.
 
 This ensures that no arbitrary code from the server runs in the main application thread, maintaining security while allowing dynamic and interactive UIs.
 

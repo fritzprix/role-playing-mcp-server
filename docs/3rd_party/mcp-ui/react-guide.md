@@ -287,13 +287,13 @@ When an action from the iframe requires asynchronous processing on the host, the
 
 ### Communication Flow
 
-1.  **Iframe to Host**: The iframe sends a message with a unique `messageId`.
-2.  **Host Acknowledgment**: The `UIResourceRenderer` automatically sends a `ui-message-received` message back to the iframe to acknowledge receipt.
-3.  **Host Processing**: The `onUIAction` function provided to the renderer is executed. This function can be `async` and performs the long-running task.
-4.  **Host Response**:
+1. **Iframe to Host**: The iframe sends a message with a unique `messageId`.
+2. **Host Acknowledgment**: The `UIResourceRenderer` automatically sends a `ui-message-received` message back to the iframe to acknowledge receipt.
+3. **Host Processing**: The `onUIAction` function provided to the renderer is executed. This function can be `async` and performs the long-running task.
+4. **Host Response**:
     - If the `onUIAction` promise resolves, `UIResourceRenderer` sends a `ui-message-response` with the resolved value as the `response`.
     - If the `onUIAction` promise rejects (throws an error), it sends a `ui-message-response` with the error details as the `error`.
-5.  **Iframe Updates**: The iframe listens for these messages and updates its UI accordingly.
+5. **Iframe Updates**: The iframe listens for these messages and updates its UI accordingly.
 
 ### Example
 

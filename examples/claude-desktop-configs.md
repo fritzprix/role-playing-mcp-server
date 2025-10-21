@@ -1,6 +1,7 @@
 # Claude Desktop 설정 예시들
 
 ## 기본 설정 (NPX 사용)
+
 ```json
 {
   "mcpServers": {
@@ -13,6 +14,7 @@
 ```
 
 ## 로컬 개발 설정
+
 ```json
 {
   "mcpServers": {
@@ -26,6 +28,7 @@
 ```
 
 ## 여러 MCP 서버와 함께 사용
+
 ```json
 {
   "mcpServers": {
