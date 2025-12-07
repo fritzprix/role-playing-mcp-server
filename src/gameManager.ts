@@ -11,7 +11,20 @@ export class GameManager {
   /**
    * 새 게임 생성
    */
-  createGame(initialState: GameState): GameResponse {
+  createGame(initialStateInput: GameState | string): GameResponse {
+    let initialState: GameState;
+    if (typeof initialStateInput === 'string') {
+      try {
+        initialState = JSON.parse(initialStateInput);
+      } catch (e) {
+        console.error('Failed to parse initialState:', e);
+        // Fallback or rethrow? For now let's ensure it's an object if possible, 
+        // or throw to fail fast. 
+        throw new Error('Invalid JSON string for initialState');
+      }
+    } else {
+      initialState = initialStateInput;
+    }
     const gameId = randomUUID();
     const now = new Date();
 
