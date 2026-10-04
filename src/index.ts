@@ -23,7 +23,7 @@ import {
 
 /**
  * RPG 게임 MCP 서버
- * 5개의 Tool 제공: createGame, updateGame, getGame, progressStory, promptUserActions
+ * 7개의 Tool 제공: createGame, updateGame, getGame, progressStory, promptUserActions, selectAction, selectRestart
  */
 class RPGMCPServer {
   private server: Server;
@@ -33,7 +33,7 @@ class RPGMCPServer {
     this.server = new Server(
       {
         name: 'rpg-mcp-server',
-        version: '1.0.0',
+        version: '1.3.3',
       },
       {
         capabilities: {
@@ -732,6 +732,7 @@ Example: ["Approach the stranger cautiously and chat (might gather info or be de
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RPG Game</title>
     <style>
@@ -918,6 +919,7 @@ Example: ["Approach the stranger cautiously and chat (might gather info or be de
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Game Over</title>
     <style>
@@ -1118,7 +1120,7 @@ Example: ["Approach the stranger cautiously and chat (might gather info or be de
         </div>
 
         <details>
-            <summary>� 전체 게임 상태 보기</summary>
+            <summary>📋 전체 게임 상태 보기</summary>
             <div class="final-state-content">${safeJsonFull}</div>
         </details>
         

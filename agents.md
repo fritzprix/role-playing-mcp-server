@@ -94,7 +94,7 @@ updateGame(isGameOver=true) → Game Over UI → [USER CLICKS RESTART] → selec
 
 ### MCP UI Integration
 
-The server uses `@mcp-ui/server` for rendering interactive HTML interfaces:
+The server renders interactive HTML interfaces following the MCP UI specification (with Content Security Policy hardening and postMessage event communication):
 
 **Game UI (`generateGameUI()`)**
 

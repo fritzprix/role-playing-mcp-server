@@ -7,24 +7,61 @@ import type { Game, GameResponse, GameState, DeltaInfo } from './types.js';
  */
 export class GameManager {
   private games: Map<string, Game> = new Map();
+  private maxGames: number;
+  private static readonly FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+  constructor(maxGames: number = 100) {
+    if (typeof maxGames !== 'number' || maxGames <= 0 || !Number.isInteger(maxGames)) {
+      throw new Error('maxGames must be a positive integer');
+    }
+    this.maxGames = maxGames;
+  }
+
+  /**
+   * LRU 캐시 갱신: 가장 최근에 사용된 게임을 Map의 끝으로 이동
+   */
+  private touchGame(gameId: string, game: Game): void {
+    this.games.delete(gameId);
+    this.games.set(gameId, game);
+  }
+
+  /**
+   * Plain object 판별 type guard
+   */
+  private isPlainObject(value: unknown): value is Record<string, unknown> {
+    if (typeof value !== 'object' || value === null) {
+      return false;
+    }
+    const proto = Object.getPrototypeOf(value);
+    return proto === Object.prototype || proto === null;
+  }
+
+  private isGameState(value: unknown): value is GameState {
+    return this.isPlainObject(value);
+  }
 
   /**
    * 새 게임 생성
    */
   createGame(initialStateInput: GameState | string): GameResponse {
-    let initialState: GameState;
+    let parsedState: unknown;
     if (typeof initialStateInput === 'string') {
       try {
-        initialState = JSON.parse(initialStateInput);
+        parsedState = JSON.parse(initialStateInput);
       } catch (e) {
         console.error('Failed to parse initialState:', e);
-        // Fallback or rethrow? For now let's ensure it's an object if possible, 
-        // or throw to fail fast. 
         throw new Error('Invalid JSON string for initialState');
       }
     } else {
-      initialState = initialStateInput;
+      parsedState = initialStateInput;
     }
+
+    if (!this.isGameState(parsedState)) {
+      throw new Error('initialState must be a non-null plain object');
+    }
+
+    // deep clone to isolate from caller mutations
+    const initialState: GameState = structuredClone(parsedState);
     const gameId = randomUUID();
     const now = new Date();
 
@@ -34,6 +71,14 @@ export class GameManager {
       createdAt: now,
       updatedAt: now,
     };
+
+    // 최대 게임 수 초과 시 가장 오래 참조되지 않은 게임 삭제 (LRU)
+    if (this.games.size >= this.maxGames) {
+      const oldestKey = this.games.keys().next().value;
+      if (oldestKey) {
+        this.games.delete(oldestKey);
+      }
+    }
 
     this.games.set(gameId, game);
 
@@ -53,11 +98,18 @@ export class GameManager {
       throw new Error(`Game with id ${gameId} not found`);
     }
 
-    // 게임 상태의 깊은 복사본 생성
-    const newState: GameState = JSON.parse(JSON.stringify(game.state));
+    if (!fieldSelector || typeof fieldSelector !== 'string' || fieldSelector.trim() === '') {
+      throw new Error('fieldSelector parameter cannot be empty');
+    }
 
     // 경로에서 'game.' 접두사 제거 (호환성)
-    const cleanPath = fieldSelector.replace(/^game\./, '');
+    const cleanPath = fieldSelector.replace(/^game\./, '').trim();
+    if (!cleanPath) {
+      throw new Error('fieldSelector parameter cannot be empty');
+    }
+
+    // 게임 상태의 깊은 복사본 생성 (Date 등 보존)
+    const newState: GameState = structuredClone(game.state);
 
     // Delta 정보 추가/업데이트
     this.addOrUpdateDelta(newState, cleanPath, value);
@@ -68,6 +120,7 @@ export class GameManager {
     // 게임 업데이트
     game.state = newState;
     game.updatedAt = new Date();
+    this.touchGame(gameId, game);
 
     console.error(`Game ${gameId} updated: ${fieldSelector} = ${JSON.stringify(value)}`);
     return {
@@ -84,6 +137,7 @@ export class GameManager {
     if (!game) {
       throw new Error(`Game with id ${gameId} not found`);
     }
+    this.touchGame(gameId, game);
     return {
       game,
       nextActions: [],
@@ -112,6 +166,7 @@ export class GameManager {
     };
 
     game.updatedAt = new Date();
+    this.touchGame(gameId, game);
 
     return {
       game,
@@ -135,6 +190,7 @@ export class GameManager {
     }
     game.state.lastStoryProgress = progress;
     game.updatedAt = new Date();
+    this.touchGame(gameId, game);
     console.error(`Game ${gameId} story progressed: ${progress}`);
     return {
       game,
@@ -158,6 +214,7 @@ export class GameManager {
     game.state._lastPromptTime = new Date();
 
     game.updatedAt = new Date();
+    this.touchGame(gameId, game);
     console.error(`Game ${gameId} prompting user actions: ${JSON.stringify(options)}`);
     return {
       game,
@@ -170,12 +227,19 @@ export class GameManager {
    */
   private setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
     const keys = this.parsePath(path);
+    if (keys.length === 0) {
+      throw new Error(`Invalid fieldSelector: path cannot be empty`);
+    }
+
     let current = obj;
 
     for (let i = 0; i < keys.length - 1; i++) {
       const key = keys[i];
+      if (this.isForbiddenKey(key)) {
+        throw new Error(`SecurityError: Forbidden property access '${key}' in path '${path}'`);
+      }
 
-      if (!(key in current)) {
+      if (!(key in current) || current[key] === null || typeof current[key] !== 'object') {
         // 다음 키가 숫자인지 확인하여 배열 또는 객체 생성
         const nextKey = keys[i + 1];
         current[key] = /^\d+$/.test(nextKey) ? [] : {};
@@ -183,7 +247,16 @@ export class GameManager {
       current = current[key] as Record<string, unknown>;
     }
 
-    current[keys[keys.length - 1]] = value;
+    const lastKey = keys[keys.length - 1];
+    if (this.isForbiddenKey(lastKey)) {
+      throw new Error(`SecurityError: Forbidden property access '${lastKey}' in path '${path}'`);
+    }
+
+    current[lastKey] = value;
+  }
+
+  private isForbiddenKey(key: string): boolean {
+    return GameManager.FORBIDDEN_KEYS.has(key);
   }
 
   /**
@@ -191,6 +264,10 @@ export class GameManager {
    * 예: "characters[0].name" -> ["characters", "0", "name"]
    */
   private parsePath(path: string): string[] {
+    if (!path || typeof path !== 'string') {
+      return [];
+    }
+
     const result: string[] = [];
     let current = '';
     let inBrackets = false;
@@ -222,6 +299,12 @@ export class GameManager {
 
     if (current) {
       result.push(current);
+    }
+
+    for (const key of result) {
+      if (this.isForbiddenKey(key)) {
+        throw new Error(`SecurityError: Forbidden property access '${key}' in path '${path}'`);
+      }
     }
 
     return result;
@@ -276,6 +359,7 @@ export class GameManager {
     const game = this.games.get(gameId);
     if (game) {
       game.state._pendingDeltas = [];
+      this.touchGame(gameId, game);
     }
   }
 
@@ -290,27 +374,40 @@ export class GameManager {
     // 현재 값 가져오기
     const currentValue = this.getNestedValue(state, field);
 
+    const clonedCurrentValue =
+      currentValue !== undefined && typeof currentValue === 'object' && currentValue !== null
+        ? structuredClone(currentValue)
+        : currentValue;
+    const clonedNewValue =
+      newValue !== undefined && typeof newValue === 'object' && newValue !== null
+        ? structuredClone(newValue)
+        : newValue;
+
     // 기존 delta 찾기
     const existingDeltaIndex = state._pendingDeltas.findIndex(delta => delta.field === field);
 
     if (existingDeltaIndex !== -1) {
       // 기존 delta 업데이트 (finalValue만 변경)
       const existingDelta = state._pendingDeltas[existingDeltaIndex];
-      existingDelta.finalValue = newValue;
+      existingDelta.finalValue = clonedNewValue;
       existingDelta.timestamp = new Date();
       existingDelta.description = this.generateDeltaDescription(
         field,
         existingDelta.initialValue,
-        newValue
+        clonedNewValue
       );
     } else {
+      // 변경 사항이 전혀 없는 경우 델타 생성 건너뛰기
+      if (JSON.stringify(currentValue) === JSON.stringify(newValue)) {
+        return;
+      }
       // 새 delta 추가
       const deltaInfo: DeltaInfo = {
         field,
-        initialValue: currentValue,
-        finalValue: newValue,
+        initialValue: clonedCurrentValue,
+        finalValue: clonedNewValue,
         timestamp: new Date(),
-        description: this.generateDeltaDescription(field, currentValue, newValue),
+        description: this.generateDeltaDescription(field, clonedCurrentValue, clonedNewValue),
       };
       state._pendingDeltas.push(deltaInfo);
     }
@@ -325,6 +422,9 @@ export class GameManager {
     let current: any = obj;
 
     for (const key of keys) {
+      if (this.isForbiddenKey(key)) {
+        throw new Error(`SecurityError: Forbidden property access '${key}' in path '${path}'`);
+      }
       if (current && typeof current === 'object' && key in current) {
         current = current[key];
       } else {
@@ -361,8 +461,10 @@ export class GameManager {
       const change = finalValue - initialValue;
       if (change > 0) {
         return `${friendlyFieldName}: increased by ${change} (${initialValue} → ${finalValue})`;
-      } else {
+      } else if (change < 0) {
         return `${friendlyFieldName}: decreased by ${Math.abs(change)} (${initialValue} → ${finalValue})`;
+      } else {
+        return `${friendlyFieldName}: unchanged (${finalValue})`;
       }
     } else {
       return `${friendlyFieldName}: changed from ${JSON.stringify(initialValue)} to ${JSON.stringify(finalValue)}`;
